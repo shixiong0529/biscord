@@ -26,7 +26,7 @@
 |---|---|
 | 后端框架 | FastAPI 0.111 + Python 3.11 |
 | ORM | SQLAlchemy 2.x |
-| 数据库 | SQLite（开发）/ PostgreSQL（生产，改一行配置） |
+| 数据库 | PostgreSQL（生产）/ SQLite（本地开发） |
 | 迁移 | Alembic |
 | 认证 | JWT（python-jose）+ bcrypt 密码加密 |
 | 实时通讯 | WebSocket（FastAPI 原生） |
@@ -231,8 +231,8 @@ uvicorn main:app --reload --port 8000
 文件：`backend/.env`
 
 ```env
-# 必填
-DATABASE_URL=sqlite:///./biscord.db
+# 必填（生产环境用 PostgreSQL，本地开发可用 SQLite）
+DATABASE_URL=postgresql://user:password@localhost:5432/biscord
 SECRET_KEY=请替换为至少32位的随机字符串
 
 # 可选（默认值）
@@ -246,12 +246,10 @@ TELEGRAM_WEBHOOK_SECRET=
 APP_BASE_URL=
 ```
 
-### 切换到 PostgreSQL（生产环境）
-
-只需修改一行：
+### 本地开发用 SQLite
 
 ```env
-DATABASE_URL=postgresql://user:password@host:5432/biscord
+DATABASE_URL=sqlite:///./biscord.db
 ```
 
 其他代码无需改动。
