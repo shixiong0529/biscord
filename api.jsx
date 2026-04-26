@@ -126,7 +126,8 @@
       body: body === undefined ? undefined : JSON.stringify(body),
     });
 
-    if (response.status === 401 && retry && path !== '/api/auth/refresh') {
+    const canRefresh = Boolean(token) && retry && !path.startsWith('/api/auth/');
+    if (response.status === 401 && canRefresh) {
       try {
         await refreshAccessToken();
         return request(method, path, body, false);
