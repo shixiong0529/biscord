@@ -47,18 +47,24 @@
 ### 服务器（社区）
 - [x] 创建服务器（可上传图标，自动创建默认频道）
 - [x] 发现推荐服务器（公开服务器列表）
-- [x] 通过邀请码加入（支持链接、纯码、服务器名）
+- [x] 通过邀请码加入（支持完整链接、hearth://协议链接、纯码、服务器名）
 - [x] 申请加入（管理员审核模式）
 - [x] 退出服务器
 - [x] 服务器成员管理（founder / mod / member 三级角色）
 - [x] 生成邀请链接（可设置使用次数和过期时间）
-- [x] 加入申请的审核（通过 / 拒绝）
+- [x] 邀请好友加入：通过私信发送带邀请链接的消息
+- [x] 加入申请的审核（通过 / 拒绝），仅 founder 可操作
+- [x] 加入申请提交时自动向 founder 发送私信通知
+- [x] 服务器设置（founder 可修改名称、缩写、颜色、图标、描述）
+- [x] 加入策略（open 自由加入 / approval 需要审核 / closed 禁止加入）
+- [x] 删除服务器（需输入名称二次确认，仅 founder）
 
 ### 频道
 - [x] 频道分组（可自定义分组名和顺序）
-- [x] 频道类型：文字频道、公告频道
+- [x] 频道类型：文字频道、公告频道、语音频道
 - [x] 在服务器内创建频道
 - [x] 频道话题（Topic）
+- [x] 编辑 / 删除频道（mod+ 可操作）
 
 ### 消息
 - [x] 发送 / 编辑 / 删除消息
@@ -81,6 +87,7 @@
 - [x] 未读消息计数
 - [x] 消息已读标记
 - [x] 私信会话列表
+- [x] 私信中服务器邀请卡片（接受 / 拒绝）
 
 ### 好友系统
 - [x] 发送 / 接受 / 拒绝好友申请（通过用户名）
@@ -99,7 +106,7 @@
 ### Telegram 推送通知
 - [x] 每用户独立 Bot Token（自带 bot，不依赖服务器统一 bot）
 - [x] 绑定方式：填入 Bot Token + Chat ID → 测试连接 → 自动绑定
-- [x] 通知事件：收到好友申请 / 好友申请通过 / 收到私信 / 频道被 @提及
+- [x] 通知事件：收到好友申请 / 好友申请通过 / 收到私信 / 频道被 @提及 / 收到加入申请（founder）
 - [x] 通知开关（随时开启/关闭）
 - [x] 解除绑定
 
@@ -111,9 +118,15 @@
 - [x] 偏好持久化（localStorage）
 - [x] 服务器图标支持自定义上传或颜色+缩写组合
 - [x] 成员侧边栏（在线状态、活动状态）
-- [x] 服务器右键菜单（邀请成员 / 退出服务器）
+- [x] 服务器右键菜单（邀请成员 / 审核申请 / 服务器设置 / 退出）
+- [x] 服务器导轨悬停 tooltip（大字加粗，含箭头指示）
 - [x] 用户资料卡弹窗
-- [x] 频道搜索
+- [x] 频道快速跳转（Ctrl+K）
+- [x] 辅助功能设置：
+  - 减少动画效果（全局禁用 transition/animation）
+  - 网站字体大小（80%–130% 滑块，实时缩放）
+  - 始终显示时间戳（连续消息旁常态显示时间）
+  - 图片点击前模糊（点击揭示，再次点击打开原图）
 
 ---
 
@@ -129,7 +142,7 @@ biscord/
 ├── auth.jsx                # 登录 / 注册界面
 ├── sidebars.jsx            # 服务器导轨、频道侧边栏、成员侧边栏
 ├── chat.jsx                # 聊天区域、消息渲染、输入框
-├── modals.jsx              # 所有弹窗（创建服务器、设置、好友等）
+├── modals.jsx              # 所有弹窗（创建服务器、设置、好友、邀请等）
 ├── extra.jsx               # 辅助组件（DM 视图、好友页、Telegram 面板）
 ├── app.jsx                 # 根组件（状态管理、路由逻辑）
 └── backend/
@@ -147,7 +160,7 @@ biscord/
     └── routers/
         ├── auth.py         # 注册 / 登录 / Token 刷新
         ├── users.py        # 用户信息读写
-        ├── servers.py      # 服务器 CRUD、邀请、加入申请
+        ├── servers.py      # 服务器 CRUD、邀请、加入申请、加入策略
         ├── channels.py     # 频道、消息、反应、置顶
         ├── dm.py           # 私信
         ├── friends.py      # 好友系统
@@ -252,7 +265,7 @@ DATABASE_URL=postgresql://user:password@host:5432/biscord
 | 表名 | 说明 |
 |------|------|
 | `users` | 用户账号，含 Telegram 绑定信息 |
-| `servers` | 服务器（社区），含图标、描述、推荐标记 |
+| `servers` | 服务器（社区），含图标、描述、推荐标记、加入策略 |
 | `server_members` | 服务器成员关系（founder / mod / member） |
 | `channel_groups` | 频道分组（侧边栏中的分类） |
 | `channels` | 频道（text / announce / voice） |
@@ -297,25 +310,39 @@ Authorization: Bearer <access_token>
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/servers` | 我加入的服务器列表 |
+| GET | `/servers` | 我加入的服务器列表（含 owner_username、join_policy） |
 | POST | `/servers` | 创建服务器 |
+| PATCH | `/servers/{id}` | 修改服务器信息（名称/图标/描述/加入策略，mod+） |
+| DELETE | `/servers/{id}` | 删除服务器（仅 founder） |
 | GET | `/servers/recommended` | 推荐服务器（含加入状态） |
-| GET | `/servers/{id}` | 服务器详情（含频道列表） |
-| GET | `/servers/{id}/members` | 成员列表 |
+| GET | `/servers/{id}` | 服务器详情（含频道列表、owner 信息） |
+| GET | `/servers/{id}/members` | 成员列表（mod+） |
 | DELETE | `/servers/{id}/members/me` | 退出服务器 |
-| POST | `/servers/{id}/invite` | 生成邀请码 |
-| POST | `/servers/join` | 通过邀请码加入 |
-| POST | `/servers/{id}/join-requests` | 申请加入（审核模式） |
-| GET | `/servers/{id}/join-requests` | 查看待审申请（mod+） |
-| POST | `/servers/{id}/join-requests/{rid}/approve` | 通过申请 |
-| POST | `/servers/{id}/join-requests/{rid}/reject` | 拒绝申请 |
+| POST | `/servers/{id}/invite` | 生成邀请码（任意成员可操作） |
+| POST | `/servers/{id}/invite-friend` | 向好友发送私信邀请（含邀请链接） |
+| POST | `/servers/join` | 通过邀请码加入，按 join_policy 处理 |
+| POST | `/servers/{id}/join-requests` | 申请加入（审核模式），自动通知 founder |
+| GET | `/servers/{id}/join-requests` | 查看待审申请（仅 founder） |
+| POST | `/servers/{id}/join-requests/{rid}/approve` | 通过申请（仅 founder） |
+| POST | `/servers/{id}/join-requests/{rid}/reject` | 拒绝申请（仅 founder） |
 | POST | `/servers/{id}/channels` | 创建频道（mod+） |
+| POST | `/servers/{id}/channel-groups` | 创建频道分组（mod+） |
+
+#### 加入策略（join_policy）
+
+| 值 | 行为 |
+|----|------|
+| `open` | 任何人通过推荐列表或邀请链接可直接加入 |
+| `approval` | 申请或接受邀请后进入待审队列，founder 审核通过才能加入，同时向 founder 发送私信通知 |
+| `closed` | 拒绝所有新成员加入 |
 
 ### 频道与消息
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/servers/{id}/channels` | 按分组返回频道列表 |
+| PATCH | `/channels/{id}` | 编辑频道名称/话题（mod+） |
+| DELETE | `/channels/{id}` | 删除频道（mod+） |
 | GET | `/channels/{id}/messages` | 消息列表（支持 limit + before 分页） |
 | POST | `/channels/{id}/messages` | 发送消息 |
 | PATCH | `/messages/{id}` | 编辑消息（仅作者） |
@@ -394,7 +421,7 @@ Authorization: Bearer <access_token>
 | `pin.update` | 置顶消息变化 | `{channel_id}` |
 | `typing.start` | 有人开始输入 | `{user_id, display_name}` |
 | `typing.stop` | 有人停止输入 | `{user_id, display_name}` |
-| `dm.new` | 收到私信 | 完整私信对象 |
+| `dm.new` | 收到私信（含加入申请通知） | 完整私信对象 |
 | `friend.request` | 收到好友申请 | 申请对象 |
 | `friend.update` | 好友申请状态变化 | 申请对象 |
 | `friend.deleted` | 被好友删除 | `{friend_id}` |
@@ -431,6 +458,7 @@ Biscord 采用**每用户独立 Bot Token** 模式：
 | 好友申请通过 | `✅ 沈温言 通过了你的好友申请` |
 | 收到私信 | `💬 江予白：你今天有看第三章吗？` |
 | 频道被 @提及 | `📢 苏沐 在 #the-drifting 提到了你：...` |
+| 收到加入申请（founder） | `📋 用户名 申请加入「服务器名」` |
 
 ---
 
@@ -456,9 +484,21 @@ modals.jsx → extra.jsx → api.jsx → auth.jsx → app.jsx
 - 用户认证状态、当前用户信息
 - 服务器列表、频道组列表、消息列表
 - 好友列表、好友申请列表
+- 辅助功能设置（字体缩放、减少动画等）
 - 各弹窗的开关状态
 
-用户偏好（主题、强调色、密度）通过 `localStorage` 持久化，键名以 `hearth-` 为前缀。
+用户偏好通过 `localStorage` 持久化，键名以 `hearth-` 为前缀：
+
+| 键名 | 说明 | 默认值 |
+|------|------|--------|
+| `hearth-theme` | 主题 | `dark` |
+| `hearth-accent` | 强调色 | `teal` |
+| `hearth-density` | 密度 | `default` |
+| `hearth-send-mode` | 发送方式 | `enter` |
+| `hearth-reduce-motion` | 减少动画 | `false` |
+| `hearth-font-size` | 字体缩放（%） | `100` |
+| `hearth-always-timestamps` | 始终显示时间戳 | `false` |
+| `hearth-blur-images` | 图片点击前模糊 | `false` |
 
 ### API 客户端（api.jsx）
 
@@ -475,6 +515,8 @@ API.connectChannel(channelId, handlers)          // WebSocket 频道连接
 API.connectDM(handlers)                          // WebSocket DM 连接
 API.sendTyping(true/false)                       // 发送输入状态
 API.disconnect()                                 // 断开所有 WebSocket
+API.parseInviteCode(rawValue)                    // 解析邀请链接/码
+API.inviteWebUrl(code)                           // 生成邀请 Web 链接
 ```
 
 Token 自动管理：`401` 响应时自动用 refresh token 换取新 access token 并重试请求。
@@ -486,8 +528,19 @@ Token 自动管理：`401` 响应时自动用 refresh token 换取新 access tok
 根元素携带 CSS 类和内联变量：
 
 ```html
-<div class="app theme-{主题名} density-{密度}" style="--accent: #8a5a2b; ...">
+<div class="app theme-{主题名} density-{密度} [reduce-motion] [always-timestamps] [blur-images]"
+     style="--accent: #8a5a2b; zoom: 1;">
 ```
+
+辅助功能 CSS 类（存在即生效）：
+
+| 类名 | 效果 |
+|------|------|
+| `reduce-motion` | 禁用所有 transition / animation |
+| `always-timestamps` | 连续消息的 inline-time 常态可见 |
+| `blur-images` | 图片预览默认模糊，点击揭示 |
+
+字体缩放通过根元素 `zoom` 属性实现（80%–130%），所有子元素等比缩放。
 
 ### 可用主题
 
