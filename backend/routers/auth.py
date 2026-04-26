@@ -56,7 +56,14 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.flush()
 
     admin_server = get_or_create_admin_server(db)
-    db.add(ServerMember(server_id=admin_server.id, user_id=user.id, role="member"))
+    existing_member = db.scalar(
+        select(ServerMember).where(
+            ServerMember.server_id == admin_server.id,
+            ServerMember.user_id == user.id,
+        )
+    )
+    if existing_member is None:
+        db.add(ServerMember(server_id=admin_server.id, user_id=user.id, role="member"))
 
     db.commit()
     db.refresh(user)
