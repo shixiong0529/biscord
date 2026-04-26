@@ -1357,48 +1357,49 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
   ];
 
   return (
-    <div className="settings-root">
+    <div className="settings-root" onClick={onClose}>
+      <div className="settings-dialog" onClick={e => e.stopPropagation()}>
       <div className="settings-sidebar">
-        <div className="group-label">User</div>
-        <a className={section === 'account' ? 'active' : ''} onClick={() => setSection('account')}>My account</a>
-        <a className={section === 'profile' ? 'active' : ''} onClick={() => setSection('profile')}>Profile</a>
-        <a>Privacy & safety</a>
+        <div className="group-label">用户</div>
+        <a className={section === 'account' ? 'active' : ''} onClick={() => setSection('account')}>我的账号</a>
+        <a className={section === 'profile' ? 'active' : ''} onClick={() => setSection('profile')}>个人资料</a>
+        <a>隐私与安全</a>
 
-        <div className="group-label">App</div>
-        <a className={section === 'appearance' ? 'active' : ''} onClick={() => setSection('appearance')}>Appearance</a>
-        <a className={section === 'accessibility' ? 'active' : ''} onClick={() => setSection('accessibility')}>Accessibility</a>
-        <a>Voice & video</a>
+        <div className="settings-sidebar-divider"/>
 
-        <div className="group-label">通知</div>
+        <div className="group-label">应用</div>
+        <a className={section === 'appearance' ? 'active' : ''} onClick={() => setSection('appearance')}>外观</a>
+        <a className={section === 'accessibility' ? 'active' : ''} onClick={() => setSection('accessibility')}>辅助功能</a>
         <a className={section === 'notifications' ? 'active' : ''} onClick={() => setSection('notifications')}>Telegram 推送</a>
-        <a>Keybinds</a>
-        <a>Language</a>
 
-        <div className="group-label">Help</div>
-        <a>What's new</a>
-        <a onClick={onLogout}>Log out</a>
+        <div className="settings-sidebar-divider"/>
+
+        <div className="group-label">其他</div>
+        <a>快捷键</a>
+        <a>语言</a>
+        <a className="danger" onClick={onLogout}>退出</a>
       </div>
 
       <div className="settings-main">
         {section === 'appearance' && (
           <>
-            <h1>Appearance</h1>
+            <h1>外观</h1>
 
             <div className="settings-section">
               <div className="settings-row">
                 <div className="label-block">
-                  <div className="title">Theme · 主题</div>
+                  <div className="title">主题</div>
                   <div className="desc">选择你喜欢的界面风格。</div>
                 </div>
               </div>
               <div className="theme-cards">
                 {[
-                  { id: 'light',    name: 'Paper · 暖纸',    bg: '#faf7f1', fg: '#2a1f14', a: '#8a5a2b' },
-                  { id: 'white',    name: 'White · 纯白',    bg: '#ffffff', fg: '#1a1a1c', a: '#6b8fe8' },
-                  { id: 'slate',    name: 'Slate · 石板灰',  bg: '#f0f2f5', fg: '#1c1f28', a: '#8a5a2b' },
-                  { id: 'dark',     name: 'Lamp · 暖夜',     bg: '#1c1612', fg: '#f3e9d7', a: '#d4a06a' },
-                  { id: 'midnight', name: 'Midnight · 午夜', bg: '#0e1117', fg: '#e4eaf6', a: '#6b8fe8' },
-                  { id: 'forest',   name: 'Forest · 苔绿',   bg: '#0c1410', fg: '#d4eecc', a: '#6ec460' },
+                  { id: 'light',    name: '暖纸',  bg: '#faf7f1', fg: '#2a1f14', a: '#8a5a2b' },
+                  { id: 'white',    name: '纯白',  bg: '#ffffff', fg: '#1a1a1c', a: '#5865f2' },
+                  { id: 'slate',    name: '石板灰', bg: '#f0f2f5', fg: '#1c1f28', a: '#5865f2' },
+                  { id: 'dark',     name: '深色',  bg: '#313338', fg: '#f2f3f5', a: '#5865f2' },
+                  { id: 'midnight', name: '午夜',  bg: '#0d0f11', fg: '#e8eaf0', a: '#7289da' },
+                  { id: 'forest',   name: '苔绿',  bg: '#1e2921', fg: '#d7f0da', a: '#57f287' },
                 ].map(t => (
                   <div key={t.id}
                        className={`theme-card ${theme === t.id ? 'active' : ''}`}
@@ -1409,7 +1410,7 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
                       <div style={{ background: t.a, maxWidth: 8 }}/>
                       <div style={{ background: t.bg }}/>
                     </div>
-                    <div style={{ fontFamily: 'var(--ff-serif)', fontWeight: 600, fontSize: 13 }}>{t.name}</div>
+                    <div style={{ fontFamily: 'var(--ff-ui)', fontWeight: 600, fontSize: 13 }}>{t.name}</div>
                   </div>
                 ))}
               </div>
@@ -1418,8 +1419,8 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
             <div className="settings-section">
               <div className="settings-row">
                 <div className="label-block">
-                  <div className="title">Accent · 主题色</div>
-                  <div className="desc">Tints highlights, mentions, and the sending button.</div>
+                  <div className="title">强调色</div>
+                  <div className="desc">影响高亮、@提及和发送按钮的颜色。</div>
                 </div>
               </div>
               <div className="accent-swatches">
@@ -1436,21 +1437,21 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
             <div className="settings-section">
               <div className="settings-row">
                 <div className="label-block">
-                  <div className="title">Density · 密度</div>
-                  <div className="desc">How much room messages get to breathe.</div>
+                  <div className="title">消息密度</div>
+                  <div className="desc">控制消息列表的行间距和字体大小。</div>
                 </div>
               </div>
               <div className="density-cards">
                 {[
-                  { id: 'compact', name: 'Compact', desc: '适合重度阅读', lines: 8 },
-                  { id: 'default', name: 'Default', desc: '推荐', lines: 6 },
-                  { id: 'cozy', name: 'Cozy', desc: '更多留白', lines: 4 },
+                  { id: 'compact', name: '紧凑', desc: '适合高效阅读', lines: 8 },
+                  { id: 'default', name: '默认', desc: '推荐设置', lines: 6 },
+                  { id: 'cozy',    name: '宽松', desc: '更多留白', lines: 4 },
                 ].map(d => (
                   <div key={d.id}
                        className={`density-card ${density === d.id ? 'active' : ''}`}
                        onClick={() => setDensity(d.id)}>
                     <div style={{ fontWeight: 600 }}>{d.name}</div>
-                    <div style={{ color: 'var(--ink-2)', fontSize: 11.5, fontStyle: 'italic', fontFamily: 'var(--ff-serif)' }}>{d.desc}</div>
+                    <div style={{ color: 'var(--ink-2)', fontSize: 11.5 }}>{d.desc}</div>
                     <div className="preview-lines">
                       {Array.from({ length: d.lines }).map((_, i) => (
                         <div key={i} style={{ width: `${60 + (i%3)*15}%` }}/>
@@ -1465,28 +1466,28 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
 
         {section === 'account' && (
           <>
-            <h1>My account</h1>
+            <h1>我的账号</h1>
             <div className="settings-section">
               <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
                 <div className={`${user.color || 'av-6'}`} style={{ width: 80, height: 80, borderRadius: '50%' }}/>
                 <div>
-                  <div style={{ fontFamily: 'var(--ff-serif)', fontSize: 22, fontWeight: 600 }}>{user.name}</div>
-                  <div style={{ fontFamily: 'var(--ff-mono)', fontSize: 13, color: 'var(--ink-2)' }}>{user.handle}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink-0)' }}>{user.name}</div>
+                  <div style={{ fontFamily: 'var(--ff-mono)', fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>{user.handle}</div>
                 </div>
               </div>
             </div>
             {[
-              ['Display name', user.name],
-              ['Username', user.handle],
-              ['Email', 'you@hearth.space'],
-              ['Phone', '—'],
+              ['显示名称', user.name],
+              ['用户名', user.handle],
+              ['电子邮件', 'you@hearth.space'],
+              ['手机号码', '—'],
             ].map(([k, v]) => (
               <div className="settings-row" key={k}>
                 <div className="label-block">
                   <div className="title" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-2)' }}>{k}</div>
-                  <div style={{ fontSize: 15, marginTop: 4, fontFamily: 'var(--ff-serif)' }}>{v}</div>
+                  <div style={{ fontSize: 15, marginTop: 4 }}>{v}</div>
                 </div>
-                <button className="btn btn-secondary">Edit</button>
+                <button className="btn btn-secondary">修改</button>
               </div>
             ))}
           </>
@@ -1494,17 +1495,17 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
 
         {section === 'profile' && (
           <>
-            <h1>Profile</h1>
-            <p style={{ color: 'var(--ink-2)', fontFamily: 'var(--ff-serif)', fontStyle: 'italic', marginTop: -16, marginBottom: 20 }}>
-              How others see you in rooms.
+            <h1>个人资料</h1>
+            <p style={{ color: 'var(--ink-2)', marginTop: -16, marginBottom: 20 }}>
+              其他人在服务器中看到的你的信息。
             </p>
             <div className="settings-section">
-              <label className="form-label">About · 自我介绍</label>
-              <textarea className="form-input" style={{ height: 80, padding: 12, lineHeight: 1.5, fontFamily: 'var(--ff-serif)', fontStyle: 'italic' }}
+              <label className="form-label">自我介绍</label>
+              <textarea className="form-input" style={{ height: 80, padding: 12, lineHeight: 1.5 }}
                 defaultValue="工作日在做事，晚上读闲书。"/>
             </div>
             <div className="settings-section">
-              <label className="form-label">Pronouns</label>
+              <label className="form-label">代词</label>
               <input className="form-input" defaultValue="她/她" style={{ width: 200 }}/>
             </div>
           </>
@@ -1512,12 +1513,12 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
 
         {section === 'accessibility' && (
           <>
-            <h1>Accessibility</h1>
+            <h1>辅助功能</h1>
             {[
-              { t: 'Reduce motion', d: 'Dims transitions and animated emojis.' },
-              { t: 'Larger message text', d: 'Adds 2pt to chat messages only.' },
-              { t: 'Always show timestamps', d: 'Shows the minute on every line.' },
-              { t: 'Dim images until clicked', d: 'Shows a soft placeholder; click to reveal.' },
+              { t: '减少动画效果', d: '减少界面过渡动画和动态表情的播放。' },
+              { t: '增大消息字号', d: '仅增大聊天消息区域的字体大小 2pt。' },
+              { t: '始终显示时间戳', d: '在每条消息旁始终显示发送时间。' },
+              { t: '图片点击前模糊', d: '图片默认模糊显示，点击后才呈现原图。' },
             ].map((r, i) => (
               <div className="settings-row" key={i}>
                 <div className="label-block">
@@ -1533,7 +1534,7 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
         {section === 'notifications' && (
           <>
             <h1>Telegram 推送</h1>
-            <p style={{ fontFamily: 'var(--ff-serif)', fontStyle: 'italic', color: 'var(--ink-2)', marginTop: -16, marginBottom: 24 }}>
+            <p style={{ color: 'var(--ink-2)', marginTop: -16, marginBottom: 24 }}>
               绑定 Telegram 后，即使不在线也能收到好友申请、私信和 @提及 通知。
             </p>
 
@@ -1601,9 +1602,9 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
       </div>
 
       <button className="close-corner" onClick={onClose}>
-        <Icon name="close" size={18}/>
-        <span className="hint">ESC</span>
+        <Icon name="close" size={16}/>
       </button>
+      </div>
     </div>
   );
 }
