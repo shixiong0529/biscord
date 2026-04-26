@@ -4,15 +4,21 @@ Telegram notification service — per-user bot token model.
 Each user stores their own bot token + chat_id.
 Biscord uses those credentials to send notifications directly to that user.
 No server-side polling or webhook needed.
+
+If the server cannot reach api.telegram.org directly (e.g. mainland China),
+set TELEGRAM_PROXY in .env:
+  TELEGRAM_PROXY=socks5://127.0.0.1:1080
+  TELEGRAM_PROXY=http://user:pass@proxy-host:3128
 """
 from __future__ import annotations
 
+import os
 import httpx
 
 from database import SessionLocal
 from models import User
 
-_TG_API = "https://api.telegram.org/bot{token}/sendMessage"
+_PROXY: str | None = os.getenv("TELEGRAM_PROXY") or None
 
 
 async def _send(bot_token: str, chat_id: int, text: str) -> dict:
@@ -20,7 +26,11 @@ async def _send(bot_token: str, chat_id: int, text: str) -> dict:
     Send a Telegram message. Returns the parsed JSON response from Telegram.
     Raises httpx.HTTPError or ValueError on failure.
     """
-    async with httpx.AsyncClient(timeout=8.0) as client:
+    client_kwargs: dict = {"timeout": 8.0}
+    if _PROXY:
+        client_kwargs["proxy"] = _PROXY
+
+    async with httpx.AsyncClient(**client_kwargs) as client:
         resp = await client.post(
             f"https://api.telegram.org/bot{bot_token}/sendMessage",
             json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
@@ -53,8 +63,9 @@ async def test_and_save(user_id: int, bot_token: str, chat_id: int) -> None:
         )
     except ValueError as e:
         raise ValueError(f"Telegram 返回错误：{e}")
-    except Exception:
-        raise ValueError("无法连接到 Telegram，请检查 Bot Token 和 Chat ID 是否正确")
+    except Exception as e:
+        proxy_hint = f"（当前代理：{_PROXY}）" if _PROXY else "（未配置代理，服务器可能无法访问 Telegram）"
+        raise ValueError(f"无法连接到 Telegram {proxy_hint}：{e}")
 
     # Credentials work — save them
     with SessionLocal() as db:
