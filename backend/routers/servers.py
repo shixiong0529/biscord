@@ -346,7 +346,7 @@ def get_server(
 
 
 @router.post("/{server_id}/join-requests", status_code=status.HTTP_201_CREATED)
-def create_join_request(
+async def create_join_request(
     server_id: int,
     request: Request,
     payload: JoinRequestCreateRequest | None = None,
@@ -393,6 +393,32 @@ def create_join_request(
     db.add(join_request)
     db.commit()
     db.refresh(join_request)
+
+    # Notify server founder via DM
+    founder_member = db.scalar(
+        select(ServerMember).where(
+            ServerMember.server_id == server_id,
+            ServerMember.role == "founder",
+        )
+    )
+    if founder_member and founder_member.user_id != current_user.id:
+        dm_content = f"📋 {current_user.display_name}（@{current_user.username}）申请加入「{server.name}」，请前往审核申请。"
+        dm_msg = DirectMessage(
+            sender_id=current_user.id,
+            receiver_id=founder_member.user_id,
+            content=dm_content,
+        )
+        db.add(dm_msg)
+        db.commit()
+        dm_msg = db.scalar(
+            select(DirectMessage)
+            .where(DirectMessage.id == dm_msg.id)
+            .options(selectinload(DirectMessage.sender), selectinload(DirectMessage.receiver))
+        )
+        encoded = jsonable_encoder(dm_to_dict(dm_msg))
+        await manager.send_to_user(founder_member.user_id, {"type": "dm.new", "data": encoded})
+        await tg_notify(founder_member.user_id, f"📋 {current_user.display_name} 申请加入「{server.name}」")
+
     return {"status": "pending", "request": join_request_to_dict(join_request)}
 
 
@@ -658,7 +684,7 @@ async def invite_friend_to_server(
 
 
 @router.post("/join")
-def join_server(
+async def join_server(
     payload: ServerJoinRequest,
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -710,6 +736,30 @@ def join_server(
                     invite.uses += 1
                 db.commit()
                 db.refresh(existing_request)
+                # Notify server founder via DM
+                founder_member = db.scalar(
+                    select(ServerMember).where(
+                        ServerMember.server_id == server.id,
+                        ServerMember.role == "founder",
+                    )
+                )
+                if founder_member and founder_member.user_id != current_user.id:
+                    dm_content = f"📋 {current_user.display_name}（@{current_user.username}）通过邀请链接申请加入「{server.name}」，请前往审核申请。"
+                    dm_msg = DirectMessage(
+                        sender_id=current_user.id,
+                        receiver_id=founder_member.user_id,
+                        content=dm_content,
+                    )
+                    db.add(dm_msg)
+                    db.commit()
+                    dm_msg = db.scalar(
+                        select(DirectMessage)
+                        .where(DirectMessage.id == dm_msg.id)
+                        .options(selectinload(DirectMessage.sender), selectinload(DirectMessage.receiver))
+                    )
+                    encoded = jsonable_encoder(dm_to_dict(dm_msg))
+                    await manager.send_to_user(founder_member.user_id, {"type": "dm.new", "data": encoded})
+                    await tg_notify(founder_member.user_id, f"📋 {current_user.display_name} 申请加入「{server.name}」")
             return {
                 "status": "pending",
                 "request": join_request_to_dict(existing_request),
