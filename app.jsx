@@ -913,6 +913,7 @@ function App() {
         servers={serverRailItems}
         activeServer={activeServerId}
         onSelect={(id) => {
+          if (id === activeServerId) return;
           setActiveServerId(id);
           setApiChannelGroups(null);
           const ch = (CHANNELS[id] || []).flatMap(g => g.items).find(c => c.kind === 'text' || c.kind === 'announce');
