@@ -29,6 +29,7 @@ function apiServerToRail(server) {
     icon_url: server.logo_url || API.assetUrl(server.icon_url),
     role: server.role,
     owner_id: server.owner_id,
+    owner_username: server.owner_username,
     owner: server.owner,
     created_at: server.created_at,
     join_policy: server.join_policy,

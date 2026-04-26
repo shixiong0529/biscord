@@ -465,6 +465,7 @@ function ServerSettingsModal({ server, onClose, onUpdated, onDeleted }) {
   const [description, setDescription] = useStateM('');
   const [joinPolicy, setJoinPolicy] = useStateM(server?.join_policy || 'approval');
   const [owner, setOwner] = useStateM(server?.owner || null);
+  const [ownerUsername, setOwnerUsername] = useStateM(server?.owner_username || server?.owner?.username || '');
   const [createdAt, setCreatedAt] = useStateM(server?.created_at || null);
   const [logoFile, setLogoFile] = useStateM(null);
   const [logoPreview, setLogoPreview] = useStateM('');
@@ -487,6 +488,7 @@ function ServerSettingsModal({ server, onClose, onUpdated, onDeleted }) {
         setDescription(detail.description || '');
         setJoinPolicy(detail.join_policy || 'approval');
         setOwner(detail.owner || null);
+        setOwnerUsername(detail.owner_username || detail.owner?.username || '');
         setCreatedAt(detail.created_at || null);
       })
       .catch(() => {});
@@ -665,7 +667,7 @@ function ServerSettingsModal({ server, onClose, onUpdated, onDeleted }) {
               <div className="server-meta-grid">
                 <div>
                   <span>创建人</span>
-                  <strong>{owner?.username || (server?.owner_id ? `用户 #${server.owner_id}` : '未知')}</strong>
+                  <strong>{ownerUsername || owner?.username || server?.owner_username || (server?.owner_id ? `用户 #${server.owner_id}` : '未知')}</strong>
                 </div>
                 <div>
                   <span>创建时间</span>
@@ -1092,12 +1094,11 @@ function InviteModal({ server, onClose }) {
   };
 
   const inviteFriend = async (friend) => {
-    if (!link) return;
+    if (!server?.id || !friend?.id) return;
     setError('');
     try {
-      await API.post(`/api/dm/${friend.id}/messages`, {
-        content: `邀请你加入 ${server.name}：${link}`,
-      });
+      const result = await API.post(`/api/servers/${server.id}/invite-friend`, { user_id: friend.id });
+      if (result?.invite) setInvite(result.invite);
       setSentTo(prev => ({ ...prev, [friend.id]: true }));
     } catch (err) {
       setError(err.message || '发送邀请失败');
@@ -1127,7 +1128,7 @@ function InviteModal({ server, onClose }) {
               <div className="friend-name">{friend.display_name}</div>
               <div className="friend-sub">@{friend.username}</div>
             </div>
-            <button className="btn btn-secondary" disabled={!link || sentTo[friend.id]} onClick={() => inviteFriend(friend)}>
+            <button className="btn btn-secondary" disabled={sentTo[friend.id]} onClick={() => inviteFriend(friend)}>
               {sentTo[friend.id] ? '已邀请' : '邀请'}
             </button>
           </div>

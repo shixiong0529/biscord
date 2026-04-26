@@ -2,21 +2,25 @@ from datetime import datetime, timedelta
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import case, delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth import get_current_user
 from database import get_db
-from models import Channel, ChannelGroup, Invite, JoinRequest, Message, PinnedMessage, Reaction, Server, ServerMember, User
+from models import Channel, ChannelGroup, DirectMessage, Friendship, Invite, JoinRequest, Message, PinnedMessage, Reaction, Server, ServerMember, User
+from routers.websocket import manager
 from schemas import (
     ChannelCreateRequest,
     ChannelGroupCreateRequest,
     InviteCreateRequest,
     JoinRequestCreateRequest,
+    ServerFriendInviteRequest,
     ServerCreateRequest,
     ServerJoinRequest,
     ServerUpdateRequest,
 )
+from telegram_service import notify as tg_notify
 
 router = APIRouter(prefix="/api/servers", tags=["servers"])
 
@@ -46,6 +50,7 @@ def server_to_dict(
         "is_recommended": server.is_recommended,
         "join_policy": server.join_policy,
         "owner_id": server.owner_id,
+        "owner_username": server.owner.username if getattr(server, "owner", None) else None,
         "owner": {
             "id": server.owner.id,
             "username": server.owner.username,
@@ -118,6 +123,60 @@ def channel_to_dict(channel: Channel) -> dict:
     }
 
 
+def user_to_dict(user: User) -> dict:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "display_name": user.display_name,
+        "avatar_color": user.avatar_color,
+        "status": user.status,
+        "bio": user.bio,
+        "created_at": user.created_at,
+    }
+
+
+def dm_to_dict(message: DirectMessage) -> dict:
+    return {
+        "id": message.id,
+        "sender_id": message.sender_id,
+        "receiver_id": message.receiver_id,
+        "content": "此消息已被删除" if message.is_deleted else message.content,
+        "created_at": message.created_at,
+        "is_read": message.is_read,
+        "is_deleted": message.is_deleted,
+        "sender": user_to_dict(message.sender),
+        "receiver": user_to_dict(message.receiver),
+    }
+
+
+def create_invite_record(db: Session, server_id: int, creator_id: int, payload: InviteCreateRequest | None = None) -> Invite:
+    payload = payload or InviteCreateRequest()
+    code = secrets.token_urlsafe(8).replace("-", "").replace("_", "")[:10]
+    while db.scalar(select(Invite).where(Invite.code == code)) is not None:
+        code = secrets.token_urlsafe(8).replace("-", "").replace("_", "")[:10]
+
+    invite = Invite(
+        server_id=server_id,
+        creator_id=creator_id,
+        code=code,
+        max_uses=payload.max_uses,
+        expires_at=datetime.utcnow() + timedelta(hours=payload.expires_hours) if payload.expires_hours else None,
+    )
+    db.add(invite)
+    return invite
+
+
+def invite_to_dict(invite: Invite, request: Request) -> dict:
+    return {
+        "code": invite.code,
+        "url": f"hearth://invite/{invite.code}",
+        "web_url": f"{str(request.base_url).rstrip('/')}/?invite={invite.code}",
+        "uses": invite.uses,
+        "max_uses": invite.max_uses,
+        "expires_at": invite.expires_at,
+    }
+
+
 @router.get("")
 def list_servers(
     request: Request,
@@ -128,6 +187,7 @@ def list_servers(
         select(Server, ServerMember.role)
         .join(ServerMember, ServerMember.server_id == Server.id)
         .where(ServerMember.user_id == current_user.id)
+        .options(selectinload(Server.owner), selectinload(Server.join_requests))
         .order_by(case((Server.name == "管理员服务器", 0), else_=1), Server.created_at)
     ).all()
     return [server_to_dict(server, role, request=request) for server, role in rows]
@@ -239,7 +299,7 @@ def list_recommended_servers(
     servers = db.scalars(
         select(Server)
         .where(Server.is_recommended == True)  # noqa: E712
-        .options(selectinload(Server.members), selectinload(Server.join_requests))
+        .options(selectinload(Server.members), selectinload(Server.join_requests), selectinload(Server.owner))
         .order_by(Server.created_at)
     ).all()
     joined_ids = set(
@@ -274,7 +334,11 @@ def get_server(
     server = db.scalar(
         select(Server)
         .where(Server.id == server_id)
-        .options(selectinload(Server.channel_groups).selectinload(ChannelGroup.channels))
+        .options(
+            selectinload(Server.channel_groups).selectinload(ChannelGroup.channels),
+            selectinload(Server.join_requests),
+            selectinload(Server.owner),
+        )
     )
     if server is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="server not found")
@@ -543,29 +607,54 @@ def create_invite(
     if db.get(Server, server_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="server not found")
 
-    payload = payload or InviteCreateRequest()
-    code = secrets.token_urlsafe(8).replace("-", "").replace("_", "")[:10]
-    while db.scalar(select(Invite).where(Invite.code == code)) is not None:
-        code = secrets.token_urlsafe(8).replace("-", "").replace("_", "")[:10]
-
-    invite = Invite(
-        server_id=server_id,
-        creator_id=current_user.id,
-        code=code,
-        max_uses=payload.max_uses,
-        expires_at=datetime.utcnow() + timedelta(hours=payload.expires_hours) if payload.expires_hours else None,
-    )
-    db.add(invite)
+    invite = create_invite_record(db, server_id, current_user.id, payload)
     db.commit()
     db.refresh(invite)
-    return {
-        "code": invite.code,
-        "url": f"hearth://invite/{invite.code}",
-        "web_url": f"{str(request.base_url).rstrip('/')}/?invite={invite.code}",
-        "uses": invite.uses,
-        "max_uses": invite.max_uses,
-        "expires_at": invite.expires_at,
-    }
+    return invite_to_dict(invite, request)
+
+
+@router.post("/{server_id}/invite-friend", status_code=status.HTTP_201_CREATED)
+async def invite_friend_to_server(
+    server_id: int,
+    request: Request,
+    payload: ServerFriendInviteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_member(db, server_id, current_user.id)
+    server = db.scalar(select(Server).where(Server.id == server_id).options(selectinload(Server.owner)))
+    if server is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="server not found")
+    if payload.user_id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot invite yourself")
+    friend = db.get(User, payload.user_id)
+    if friend is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+    if db.scalar(select(Friendship).where(Friendship.user_id == current_user.id, Friendship.friend_id == friend.id)) is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="user is not your friend")
+
+    invite = create_invite_record(db, server_id, current_user.id)
+    db.flush()
+    invite_data = invite_to_dict(invite, request)
+    message = DirectMessage(
+        sender_id=current_user.id,
+        receiver_id=friend.id,
+        content=f"邀请你加入 {server.name}：{invite_data['web_url']}",
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(invite)
+    message = db.scalar(
+        select(DirectMessage)
+        .where(DirectMessage.id == message.id)
+        .options(selectinload(DirectMessage.sender), selectinload(DirectMessage.receiver))
+    )
+    data = dm_to_dict(message)
+    encoded = jsonable_encoder(data)
+    await manager.send_to_user(friend.id, {"type": "dm.new", "data": encoded})
+    await manager.send_to_user(current_user.id, {"type": "dm.new", "data": encoded})
+    await tg_notify(friend.id, f"💬 <b>{current_user.display_name}</b>：邀请你加入 {server.name}")
+    return {"invite": invite_to_dict(invite, request), "message": data}
 
 
 @router.post("/join")

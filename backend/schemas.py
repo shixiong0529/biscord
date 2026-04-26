@@ -88,6 +88,10 @@ class InviteCreateRequest(BaseModel):
     expires_hours: int | None = Field(default=None, ge=1, le=720)
 
 
+class ServerFriendInviteRequest(BaseModel):
+    user_id: int
+
+
 class MessageCreateRequest(BaseModel):
     content: str = Field(min_length=1)
     reply_to_id: int | None = None
