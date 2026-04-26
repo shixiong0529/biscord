@@ -53,7 +53,7 @@ def ensure_schema_compatibility() -> None:
         if "description" not in server_columns:
             connection.execute(text("ALTER TABLE servers ADD COLUMN description VARCHAR(256)"))
         if "is_recommended" not in server_columns:
-            connection.execute(text("ALTER TABLE servers ADD COLUMN is_recommended BOOLEAN NOT NULL DEFAULT 0"))
+            connection.execute(text("ALTER TABLE servers ADD COLUMN is_recommended BOOLEAN NOT NULL DEFAULT false"))
         for table in (JoinRequest.__table__, FriendRequest.__table__, Friendship.__table__):
             table.create(bind=connection, checkfirst=True)
         recommended = {
@@ -64,12 +64,12 @@ def ensure_schema_compatibility() -> None:
         }
         for name, description in recommended.items():
             connection.execute(
-                text("UPDATE servers SET is_recommended = 1, description = :description WHERE name = :name"),
-                {"name": name, "description": description},
+                text("UPDATE servers SET is_recommended = :is_recommended, description = :description WHERE name = :name"),
+                {"name": name, "description": description, "is_recommended": True},
             )
         connection.execute(
-            text("UPDATE servers SET is_recommended = 0, description = :description WHERE name = '管理员服务器'"),
-            {"description": "系统默认服务器，用于公告、审核和管理通知。"},
+            text("UPDATE servers SET is_recommended = :is_recommended, description = :description WHERE name = '管理员服务器'"),
+            {"description": "系统默认服务器，用于公告、审核和管理通知。", "is_recommended": False},
         )
 
 
