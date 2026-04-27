@@ -172,7 +172,7 @@ function AdminLogin({ onLogin }) {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper-0)' }}>
       <form onSubmit={handleSubmit} style={{ width: 320, background: 'var(--paper-1)', borderRadius: 12, padding: 32, boxShadow: '0 4px 24px rgba(0,0,0,.2)' }}>
-        <h2 style={{ margin: '0 0 24px', fontSize: 20, color: 'var(--ink-0)' }}>摸鱼社区 · 管理后台</h2>
+        <h2 style={{ margin: '0 0 24px', fontSize: 20, color: 'var(--ink-0)', textAlign: 'center' }}>摸鱼社区 · 管理后台</h2>
         {error && <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--paper-2)', borderRadius: 6, color: '#e06c75', fontSize: 13 }}>{error}</div>}
         <label style={{ display: 'block', marginBottom: 12 }}>
           <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>用户名</span>
@@ -184,7 +184,9 @@ function AdminLogin({ onLogin }) {
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
             style={{ display: 'block', width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 6, border: '1px solid var(--paper-2)', background: 'var(--paper-0)', color: 'var(--ink-0)', fontSize: 17, boxSizing: 'border-box' }} />
         </label>
-        <Btn type="submit" disabled={loading}>{loading ? '登录中…' : '登录'}</Btn>
+        <div style={{ textAlign: 'center' }}>
+          <Btn type="submit" disabled={loading}>{loading ? '登录中…' : '登录'}</Btn>
+        </div>
       </form>
     </div>
   );
