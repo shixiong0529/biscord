@@ -101,7 +101,9 @@ backend/routers/admin.py         ← 全部管理 API（单路由文件）
 ### 边界规则（所有写操作均适用）
 
 - **禁止操作自身**：`ban`、`revoke_admin` 不允许目标为当前登录管理员自身，返回 `400`。
-- **保护最后一个管理员**：`revoke_admin` 前检查系统中 `is_admin=True` 的用户数，若仅剩一人则拒绝，返回 `400`（附提示"至少保留一名管理员"）。同理，`ban` 操作不允许封禁拥有 `is_admin=True` 的用户（须先撤权再封禁）。
+- **保护最后一个管理员**：`revoke_admin` 前检查系统中 `is_admin=True` 的用户数，若仅剩一人则拒绝，返回 `400`（附提示"至少保留一名管理员"）。同理，`ban` 操作不允许封禁拥有 `is_admin=True` 的用户（须先撤权再封禁），否则返回 `400`。
+- **举报重复处理**：`resolve` / `dismiss` 仅对 `status=pending` 的举报有效，已处理（`resolved` 或 `dismissed`）的举报再次提交返回 `400`。
+- **用户删除**：本期不提供删除用户功能，只有封禁；用户记录始终保留，`audit_logs.admin_id` 外键完整性不受影响。`audit_logs.detail` 的具体 JSON 结构由实现时约定，设计阶段不做强制规定。
 
 ### 统计概览
 
