@@ -367,7 +367,7 @@ function ServerDetailPage({ serverId, onBack }) {
         <InfoRow label="加入策略" value={{ open: '自由加入', approval: '需要审核', closed: '禁止加入' }[server.join_policy] || server.join_policy} />
         <InfoRow label="推荐" value={server.is_recommended ? '是' : '否'} />
         <InfoRow label="创建时间" value={fmtTime(server.created_at)} />
-        <InfoRow label="创建人" value={server.owner_display_name ? `${server.owner_display_name}（@${server.owner_username}）` : '-'} />
+        <InfoRow label="创建人" value={server.owner_display_name ? `${server.owner_display_name}（@${server.owner_username}）` : `已删除用户（ID: ${server.owner_id}）`} />
         <InfoRow label="管理员" value={server.mods && server.mods.length > 0 ? server.mods.join('、') : '无'} />
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
