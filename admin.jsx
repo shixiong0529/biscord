@@ -129,9 +129,11 @@ function Table({ cols, rows, onRowClick }) {
 }
 function SearchBar({ value, onChange, onSearch, placeholder }) {
   return (
-    <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-      <Input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder || '搜索…'}
-        onKeyDown={e => e.key === 'Enter' && onSearch(value)} />
+    <div style={{ display: 'inline-flex', gap: 8, marginBottom: 16 }}>
+      <input value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder || '搜索…'}
+        onKeyDown={e => e.key === 'Enter' && onSearch(value)}
+        style={{ width: 300, padding: '7px 12px', borderRadius: 6, border: '1px solid var(--paper-2)', background: 'var(--paper-0)', color: 'var(--ink-0)', fontSize: 17 }} />
       <Btn onClick={() => onSearch(value)}>搜索</Btn>
     </div>
   );
