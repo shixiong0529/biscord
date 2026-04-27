@@ -347,7 +347,7 @@ function ServerDetailPage({ serverId, onBack }) {
   async function act(fn, afterFn) {
     try { await fn(); setMsg('操作成功'); if (afterFn) afterFn(); else setRev(r => r + 1); }
     catch (e) { setMsg(e.message); }
-  }}
+  }
 
   if (loading) return <Spinner />;
   if (error) return <Err msg={error} />;
