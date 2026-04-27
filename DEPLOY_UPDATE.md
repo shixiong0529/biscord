@@ -1,10 +1,16 @@
-# Biscord 服务器更新命令
+# 摸鱼社区 服务器更新命令
 
-服务器路径：
+服务器路径（路径保持不变，不需要改）：
 
 ```bash
 /opt/biscord/current
 ```
+
+> ⚠️ Git 仓库已从 `biscord` 改名为 `moyu`。服务器首次 pull 前需执行一次：
+> ```bash
+> cd /opt/biscord/current
+> git remote set-url origin https://github.com/shixiong0529/moyu.git
+> ```
 
 域名：
 
