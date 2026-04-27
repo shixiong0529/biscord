@@ -12,8 +12,9 @@ from sqlalchemy import inspect, text
 from auth import get_current_user
 from database import engine
 from models import FriendRequest, Friendship, JoinRequest, User
-from routers import auth, channels, dm, friends, servers, users, websocket
+from routers import auth, channels, dm, friends, reports, servers, users, websocket
 from routers import telegram_bot
+from routers import admin as admin_router
 import telegram_service
 
 
@@ -40,6 +41,7 @@ BACKEND_ROOT = Path(__file__).resolve().parent
 UPLOAD_DIR = BACKEND_ROOT / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 FRONTEND_ENTRY = PROJECT_ROOT / "Hearth Community.html"
+ADMIN_ENTRY = PROJECT_ROOT / "admin.html"
 FRONTEND_FILES = {
     "styles.css",
     "icons.jsx",
@@ -52,6 +54,7 @@ FRONTEND_FILES = {
     "auth.jsx",
     "app.jsx",
     "browser-window.jsx",
+    "admin.jsx",
 }
 
 
@@ -116,6 +119,8 @@ app.include_router(dm.router)
 app.include_router(friends.router)
 app.include_router(websocket.router)
 app.include_router(telegram_bot.router)
+app.include_router(reports.router)
+app.include_router(admin_router.router)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 DOCS_DIR = PROJECT_ROOT / "docs"
 DOCS_DIR.mkdir(exist_ok=True)
