@@ -80,7 +80,11 @@ function MessageGroup({ msg, onOpenProfile, onReact, onEdit, onDelete, onPin, on
   const [editValue, setEditValue] = useStateChat(msg.content || msg.lines?.join('\n') || '');
   const [menu, setMenu] = useStateChat(null);
   const canEdit = msg.authorId === currentUser?.id && !msg.isDeleted;
-  const canDelete = !msg.isDeleted && (msg.authorId === currentUser?.id || ['founder', 'mod'].includes(currentRole));
+  const canDelete = !msg.isDeleted && (
+    msg.authorId === currentUser?.id ||
+    currentUser?.is_admin ||
+    ['founder', 'mod'].includes(currentRole)
+  );
   const canPin = !msg.isDeleted && ['founder', 'mod'].includes(currentRole);
   const content = msg.content || msg.lines?.join('\n') || '';
   const html = useMemoChat(() => renderMessageHtml(content), [content]);

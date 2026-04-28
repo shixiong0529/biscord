@@ -308,7 +308,12 @@ async def delete_message(
     if message is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="message not found")
     member = get_server_member(db, message.channel.server_id, current_user.id)
-    if message.author_id != current_user.id and (member is None or member.role not in {"founder", "mod"}):
+    can_delete = (
+        message.author_id == current_user.id
+        or current_user.is_admin
+        or (member is not None and member.role in {"founder", "mod"})
+    )
+    if not can_delete:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="insufficient permissions")
 
     message.is_deleted = True

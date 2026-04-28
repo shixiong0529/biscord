@@ -463,6 +463,7 @@ function App() {
       avatar_url: currentUser.avatar_url || null,
       status: currentUser.status || 'online',
       bio: currentUser.bio,
+      is_admin: currentUser.is_admin || false,
     };
   }, [currentUser]);
   const isDM = activeServer?.kind === 'dm';
@@ -609,12 +610,7 @@ function App() {
       onDelete: (message) => {
         setMessagesByChannel(prev => ({
           ...prev,
-          [channelKey]: (prev[channelKey] || []).map(item => item.id === message.id ? {
-            ...item,
-            content: '此消息已被删除',
-            lines: ['此消息已被删除'],
-            isDeleted: true,
-          } : item),
+          [channelKey]: (prev[channelKey] || []).filter(item => item.id !== message.id),
         }));
       },
       onReaction: (reaction) => {
