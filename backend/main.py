@@ -3,9 +3,10 @@ from pathlib import Path
 import os
 import uuid
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 
@@ -36,6 +37,45 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Biscord API", version="0.1.0", lifespan=lifespan)
+
+
+def _translate_error(err: dict) -> str:
+    etype = err.get("type", "")
+    loc = err.get("loc", [])
+    ctx = err.get("ctx", {})
+    field = str(loc[-1]) if loc else ""
+
+    FIELD_NAMES = {
+        "username": "用户名", "display_name": "显示名", "password": "密码",
+        "name": "名称", "content": "内容", "reason": "原因",
+        "email": "邮箱", "short_name": "简称",
+    }
+    field_cn = FIELD_NAMES.get(field, field)
+
+    if etype == "missing":
+        return f"{field_cn}不能为空"
+    if etype == "string_too_short":
+        mn = ctx.get("min_length", "")
+        return f"{field_cn}至少需要 {mn} 个字符"
+    if etype == "string_too_long":
+        mx = ctx.get("max_length", "")
+        return f"{field_cn}不能超过 {mx} 个字符"
+    if etype == "string_pattern_mismatch":
+        return f"{field_cn}格式不正确，不能包含空格及 @、#、/ 等特殊符号"
+    if etype == "value_error":
+        return err.get("msg", "输入格式有误").removeprefix("Value error, ")
+    if etype in ("int_parsing", "float_parsing"):
+        return f"{field_cn}必须是数字"
+    if etype == "bool_parsing":
+        return f"{field_cn}必须是 true 或 false"
+    return err.get("msg", "输入格式有误")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = [_translate_error(e) for e in exc.errors()]
+    detail = "；".join(errors) if errors else "请求参数有误"
+    return JSONResponse(status_code=422, content={"detail": detail})
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BACKEND_ROOT = Path(__file__).resolve().parent
 UPLOAD_DIR = BACKEND_ROOT / "uploads"
