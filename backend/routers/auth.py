@@ -45,7 +45,7 @@ def get_or_create_admin_server(db: Session) -> Server:
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.scalar(select(User).where(User.username == payload.username))
     if existing is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already exists")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该用户名已被使用，换一个试试")
 
     user = User(
         username=payload.username,
@@ -90,7 +90,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.username == payload.username))
     if user is None or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid username or password")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
     if user.is_banned:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=user.banned_reason or "account banned")
 

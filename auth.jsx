@@ -175,9 +175,19 @@ function IconWeibo() {
   );
 }
 
+function EyeBtn({ show, onToggle }) {
+  return (
+    <button type="button" onClick={onToggle} title={show ? "隐藏密码" : "显示密码"}
+      style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", color: "var(--ink-2)", fontSize: 16, padding: "0 4px", lineHeight: 1 }}>
+      {show ? "🙈" : "👁️"}
+    </button>
+  );
+}
+
 function LoginPane({ active, loading, error, onLogin }) {
   const [u, setU] = useStateAuth("");
   const [p, setP] = useStateAuth("");
+  const [showP, setShowP] = useStateAuth(false);
   const [remember, setRemember] = useStateAuth(true);
   const valid = u.trim().length >= 2 && p.length >= 6;
 
@@ -189,7 +199,10 @@ function LoginPane({ active, loading, error, onLogin }) {
       </div>
       <div className="field">
         <label>密码</label>
-        <input className="input" type="password" placeholder="••••••••" value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" />
+        <div style={{ position: "relative" }}>
+          <input className="input" type={showP ? "text" : "password"} style={{ width: "100%", paddingRight: 40 }} placeholder="••••••••" value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" />
+          <EyeBtn show={showP} onToggle={() => setShowP(v => !v)} />
+        </div>
       </div>
       <div className="helper">
         <label className="check">
@@ -208,6 +221,7 @@ function RegisterPane({ active, loading, error, onRegister }) {
   const [u, setU] = useStateAuth("");
   const [d, setD] = useStateAuth("");
   const [p, setP] = useStateAuth("");
+  const [showP, setShowP] = useStateAuth(false);
   const [agree, setAgree] = useStateAuth(true);
   const valid = u.trim().length >= 2 && d.trim().length >= 1 && p.length >= 6 && agree;
 
@@ -240,7 +254,10 @@ function RegisterPane({ active, loading, error, onRegister }) {
       </div>
       <div className="field">
         <label>密码</label>
-        <input className="input" type="password" placeholder="至少 6 位" value={p} onChange={(e) => setP(e.target.value)} />
+        <div style={{ position: "relative" }}>
+          <input className="input" type={showP ? "text" : "password"} style={{ width: "100%", paddingRight: 40 }} placeholder="至少 6 位" value={p} onChange={(e) => setP(e.target.value)} />
+          <EyeBtn show={showP} onToggle={() => setShowP(v => !v)} />
+        </div>
       </div>
       <div className="helper">
         <label className="check">

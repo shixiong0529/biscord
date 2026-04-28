@@ -61,7 +61,9 @@ def _translate_error(err: dict) -> str:
         mx = ctx.get("max_length", "")
         return f"{field_cn}不能超过 {mx} 个字符"
     if etype == "string_pattern_mismatch":
-        return f"{field_cn}格式不正确，不能包含空格及 @、#、/ 等特殊符号"
+        if field == "username":
+            return "用户名只能包含英文字母、数字和下划线"
+        return f"{field_cn}格式不正确"
     if etype == "value_error":
         return err.get("msg", "输入格式有误").removeprefix("Value error, ")
     if etype in ("int_parsing", "float_parsing"):
