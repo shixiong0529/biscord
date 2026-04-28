@@ -111,7 +111,7 @@
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
     const data = await parseResponse(response);
-    setToken(data.access_token, refreshToken);
+    setToken(data.access_token, data.refresh_token || refreshToken);
     return data.access_token;
   }
 

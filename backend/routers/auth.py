@@ -99,17 +99,18 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return make_token_pair(user)
 
 
-@router.post("/refresh", response_model=AccessTokenResponse)
+@router.post("/refresh", response_model=TokenResponse)
 def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
     token_payload = decode_token(payload.refresh_token)
     if token_payload.get("token_type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
 
     user_id = token_payload.get("sub")
-    if user_id is None or db.get(User, int(user_id)) is None:
+    user = db.get(User, int(user_id)) if user_id else None
+    if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
 
-    return {"access_token": create_access_token(int(user_id))}
+    return make_token_pair(user)
 
 
 @router.post("/logout", response_model=OkResponse)
