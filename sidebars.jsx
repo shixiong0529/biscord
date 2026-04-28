@@ -45,21 +45,31 @@ function ServerRail({
 }) {
   const [menu, setMenu] = useState(null);
   const [localServers, setLocalServers] = React.useState(servers);
+  const dragIdRef = React.useRef(null);
+  const localServersRef = React.useRef(localServers);
   const [dragId, setDragId] = React.useState(null);
 
   React.useEffect(() => { setLocalServers(servers); }, [servers]);
+  React.useEffect(() => { localServersRef.current = localServers; }, [localServers]);
 
   function startDrag(e, id) {
     if (e.button !== 0) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    dragIdRef.current = id;
     setDragId(id);
   }
 
-  function moveDrag(id) {
-    if (!dragId || dragId === id) return;
+  function handleRailPointerMove(e) {
+    if (!dragIdRef.current) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el) return;
+    const pill = el.closest('[data-sid]');
+    if (!pill) return;
+    const targetId = parseInt(pill.dataset.sid);
+    if (!targetId || targetId === dragIdRef.current) return;
+    const dragged = dragIdRef.current;
     setLocalServers(prev => {
-      const from = prev.findIndex(s => s.id === dragId);
-      const to = prev.findIndex(s => s.id === id);
+      const from = prev.findIndex(s => s.id === dragged);
+      const to = prev.findIndex(s => s.id === targetId);
       if (from < 0 || to < 0) return prev;
       const next = [...prev];
       const [item] = next.splice(from, 1);
@@ -69,15 +79,19 @@ function ServerRail({
   }
 
   function endDrag() {
-    if (!dragId) return;
+    if (!dragIdRef.current) return;
+    dragIdRef.current = null;
     setDragId(null);
-    const ids = localServers.filter(s => !s.kind && s.id !== 'divider' && s.id !== 'divider2').map(s => s.id);
+    const ids = localServersRef.current.filter(s => !s.kind && s.id !== 'divider' && s.id !== 'divider2').map(s => s.id);
     API.patch('/api/servers/reorder', { order: ids }).catch(() => {});
   }
 
   return (
     <div className="server-rail">
-      <div className="server-rail-scroll">
+      <div className="server-rail-scroll"
+           onPointerMove={handleRailPointerMove}
+           onPointerUp={endDrag}
+           onPointerCancel={endDrag}>
       {localServers.map((s, i) => {
         if (s.id === 'divider' || s.id === 'divider2') return <div key={i} className="server-divider" />;
         const active = activeServer === s.id;
@@ -85,13 +99,11 @@ function ServerRail({
         const isDragging = dragId === s.id;
         return (
           <div key={s.id} className={`server-pill ${active ? 'active' : ''}`}
-               style={{ opacity: isDragging ? 0.5 : 1, cursor: isDraggable ? (dragId ? 'grabbing' : 'grab') : 'pointer', transition: 'transform 0.12s' }}
+               data-sid={isDraggable ? s.id : undefined}
+               style={{ opacity: isDragging ? 0.5 : 1, cursor: isDraggable ? (dragId ? 'grabbing' : 'grab') : 'pointer', transition: 'opacity 0.1s' }}
                onPointerDown={isDraggable ? e => startDrag(e, s.id) : undefined}
-               onPointerEnter={isDraggable ? () => moveDrag(s.id) : undefined}
-               onPointerUp={isDraggable ? endDrag : undefined}
-               onPointerCancel={isDraggable ? endDrag : undefined}
                onClick={() => {
-                 if (dragId) return;
+                 if (dragIdRef.current) return;
                  if (s.kind === 'add') return onAdd();
                  onSelect(s.id);
                }}
