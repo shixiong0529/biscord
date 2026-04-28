@@ -116,7 +116,7 @@ class HealthSchema(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_]+$")
+    username: str = Field(min_length=2, max_length=32, pattern=r"^[^\s@#/\\]+$")
     display_name: str = Field(min_length=1, max_length=32)
     password: str = Field(min_length=6)
 
