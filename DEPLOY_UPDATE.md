@@ -1,9 +1,12 @@
 # 摸鱼社区 服务器更新命令
 
-服务器路径（路径保持不变，不需要改）：
+服务器信息：
 
-```bash
-/opt/biscord/current
+```
+IP：    8.148.27.161
+路径：  /opt/biscord/current
+域名：  https://shi.show  /  https://moyu.in
+SSH：   ssh root@8.148.27.161
 ```
 
 > ⚠️ Git 仓库已从 `biscord` 改名为 `moyu`。服务器首次 pull 前需执行一次：
@@ -11,12 +14,6 @@
 > cd /opt/biscord/current
 > git remote set-url origin https://github.com/shixiong0529/moyu.git
 > ```
-
-域名：
-
-```bash
-https://shi.show
-```
 
 旧站点 `/opt/red/current` 不动，`chat.slow.best` 继续走旧站。
 
@@ -41,6 +38,61 @@ curl https://shi.show/api/health
 
 ```json
 {"status":"ok"}
+```
+
+## 数据库同步（本地覆盖服务器）
+
+> 将本地 SQLite 数据完整替换到生产 PostgreSQL，适用于数据重置或初始化场景。
+
+### 第一步：本地导出（Windows 本地执行）
+
+```bash
+cd c:\Users\Administrator\Desktop\moyu\backend
+python export_sqlite.py
+```
+
+生成 `backend/export.sql`（UTF-8，自动写文件无需重定向）。
+
+### 第二步：上传到服务器
+
+```bash
+# 上传数据库文件
+scp backend/export.sql root@8.148.27.161:/opt/biscord/current/backend/export_new.sql
+
+# 上传图片（有新增图片时执行）
+scp -r backend/uploads/* root@8.148.27.161:/opt/biscord/current/backend/uploads/
+```
+
+### 第三步：服务器上验证完整性
+
+```bash
+grep -c "COMMIT" /opt/biscord/current/backend/export_new.sql
+tail -3 /opt/biscord/current/backend/export_new.sql
+```
+
+`COMMIT` 数量必须为 `1`，最后一行是 `COMMIT;` 再继续。
+
+### 第四步：停服、导入、重启
+
+```bash
+sudo systemctl stop biscord
+
+cd /opt/biscord/current/backend
+source .venv/bin/activate
+
+# 过滤孤立私信（避免 FK 约束报错）
+grep -v "INSERT INTO direct_messages" export_new.sql > export_clean.sql
+
+# 导入（遇错自动停止）
+psql "postgresql://biscord:Biscord_2026_Strong_Pass@127.0.0.1:5432/biscord" \
+  -v ON_ERROR_STOP=1 -f export_clean.sql 2>&1 | tail -5
+
+# 验证服务器数据
+psql "postgresql://biscord:Biscord_2026_Strong_Pass@127.0.0.1:5432/biscord" \
+  -c "SELECT id, name FROM servers ORDER BY id;"
+
+sudo systemctl start biscord
+curl https://shi.show/api/health
 ```
 
 ## 查看日志
