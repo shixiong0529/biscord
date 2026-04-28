@@ -54,6 +54,7 @@ function ServerRail({
 
   function startDrag(e, id) {
     if (e.button !== 0) return;
+    if (dragIdRef.current) return;
     e.preventDefault();
     dragIdRef.current = id;
     setDragId(id);
@@ -135,6 +136,7 @@ function ServerRail({
                     src={API.assetUrl(s.icon_url)}
                     alt={s.name}
                     className="server-logo-img"
+                    draggable={false}
                     onError={e => { e.currentTarget.style.display = 'none'; }}
                   />
                 ) : (
