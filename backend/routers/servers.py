@@ -185,13 +185,33 @@ def list_servers(
     db: Session = Depends(get_db),
 ):
     rows = db.execute(
-        select(Server, ServerMember.role)
+        select(Server, ServerMember.role, ServerMember.position)
         .join(ServerMember, ServerMember.server_id == Server.id)
         .where(ServerMember.user_id == current_user.id)
         .options(selectinload(Server.owner), selectinload(Server.join_requests))
-        .order_by(case((Server.name == "管理员服务器", 0), else_=1), Server.created_at)
+        .order_by(ServerMember.position, Server.created_at)
     ).all()
-    return [server_to_dict(server, role, request=request) for server, role in rows]
+    return [server_to_dict(server, role, request=request) for server, role, _ in rows]
+
+
+@router.patch("/reorder")
+def reorder_servers(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    order: list[int] = payload.get("order", [])
+    for position, server_id in enumerate(order):
+        member = db.scalar(
+            select(ServerMember).where(
+                ServerMember.server_id == server_id,
+                ServerMember.user_id == current_user.id,
+            )
+        )
+        if member:
+            member.position = position
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

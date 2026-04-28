@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, func, select, update as sa_update
 from sqlalchemy.orm import Session
 
@@ -269,6 +270,31 @@ def toggle_recommended(server_id: int, admin: User = Depends(require_admin), db:
         raise HTTPException(status_code=404, detail="server not found")
     s.is_recommended = not s.is_recommended
     write_audit(db, admin.id, "toggle_recommended", "server", server_id, {"is_recommended": s.is_recommended})
+    db.commit()
+    return OkResponse(ok=True)
+
+
+class ServerAdminSettingsRequest(BaseModel):
+    auto_join: bool | None = None
+    join_order: int | None = None
+
+
+@router.patch("/servers/{server_id}/admin-settings", response_model=OkResponse)
+def update_server_admin_settings(
+    server_id: int,
+    payload: ServerAdminSettingsRequest,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    s = db.get(Server, server_id)
+    if s is None:
+        raise HTTPException(status_code=404, detail="server not found")
+    if payload.auto_join is not None:
+        s.auto_join = payload.auto_join
+    if payload.join_order is not None:
+        s.join_order = payload.join_order
+    write_audit(db, admin.id, "update_server_settings", "server", server_id,
+                {"auto_join": payload.auto_join, "join_order": payload.join_order})
     db.commit()
     return OkResponse(ok=True)
 

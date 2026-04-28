@@ -369,14 +369,28 @@ function ServerDetailPage({ serverId, onBack }) {
         <InfoRow label="创建时间" value={fmtTime(server.created_at)} />
         <InfoRow label="创建人" value={server.owner_display_name ? `${server.owner_display_name}（@${server.owner_username}）` : `已删除用户（ID: ${server.owner_id}）`} />
         <InfoRow label="管理员" value={server.mods && server.mods.length > 0 ? server.mods.join('、') : '无'} />
+        <InfoRow label="新用户默认加入" value={server.auto_join ? '是' : '否'} />
+        <InfoRow label="默认加入顺序" value={server.join_order === 999 ? '未设置' : server.join_order} />
       </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         <Btn onClick={() => act(() => api.patch(`/api/admin/servers/${serverId}/recommended`))}>
           {server.is_recommended ? '取消推荐' : '设为推荐'}
+        </Btn>
+        <Btn onClick={() => act(() => api.patch(`/api/admin/servers/${serverId}/admin-settings`, { auto_join: !server.auto_join }))}>
+          {server.auto_join ? '✓ 新用户默认加入（点击关闭）' : '设为新用户默认加入'}
         </Btn>
         <Btn danger onClick={() => { if (!confirm('确认强制删除该服务器？此操作不可撤销。')) return; act(() => api.del(`/api/admin/servers/${serverId}`), onBack); }}>
           强制删除
         </Btn>
+      </div>
+      <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center', marginBottom: 20 }}>
+        <span style={{ fontSize: 14, color: 'var(--ink-2)' }}>新用户加入顺序（数字越小越靠前）：</span>
+        <input type="number" defaultValue={server.join_order} id={`join-order-${serverId}`}
+          style={{ width: 80, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--paper-2)', background: 'var(--paper-0)', color: 'var(--ink-0)', fontSize: 15 }} />
+        <Btn small onClick={() => {
+          const val = parseInt(document.getElementById(`join-order-${serverId}`).value);
+          if (!isNaN(val)) act(() => api.patch(`/api/admin/servers/${serverId}/admin-settings`, { join_order: val }));
+        }}>保存</Btn>
       </div>
       <h3 style={{ margin: '0 0 12px', fontSize: 15 }}>频道列表</h3>
       <Table

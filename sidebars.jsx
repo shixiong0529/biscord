@@ -44,14 +44,52 @@ function ServerRail({
   onSetTheme,
 }) {
   const [menu, setMenu] = useState(null);
+  const [localServers, setLocalServers] = React.useState(servers);
+  const dragRef = React.useRef(null);
+
+  React.useEffect(() => { setLocalServers(servers); }, [servers]);
+
+  function handleDragStart(e, id) {
+    dragRef.current = id;
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleDragOver(e, id) {
+    e.preventDefault();
+    if (!dragRef.current || dragRef.current === id) return;
+    setLocalServers(prev => {
+      const from = prev.findIndex(s => s.id === dragRef.current);
+      const to = prev.findIndex(s => s.id === id);
+      if (from === -1 || to === -1) return prev;
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+    dragRef.current = id;
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    dragRef.current = null;
+    const ids = localServers.filter(s => !s.kind && s.id !== 'divider' && s.id !== 'divider2').map(s => s.id);
+    API.patch('/api/servers/reorder', { order: ids }).catch(() => {});
+  }
+
   return (
     <div className="server-rail">
       <div className="server-rail-scroll">
-      {servers.map((s, i) => {
+      {localServers.map((s, i) => {
         if (s.id === 'divider' || s.id === 'divider2') return <div key={i} className="server-divider" />;
         const active = activeServer === s.id;
+        const isDraggable = !s.kind;
         return (
           <div key={s.id} className={`server-pill ${active ? 'active' : ''}`}
+               draggable={isDraggable}
+               onDragStart={isDraggable ? e => handleDragStart(e, s.id) : undefined}
+               onDragOver={isDraggable ? e => handleDragOver(e, s.id) : undefined}
+               onDrop={isDraggable ? handleDrop : undefined}
+               onDragEnd={() => { dragRef.current = null; }}
                onClick={() => {
                  if (s.kind === 'add') return onAdd();
                  onSelect(s.id);

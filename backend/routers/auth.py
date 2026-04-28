@@ -55,15 +55,31 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.flush()
 
+    # 自动加入所有 auto_join=True 的服务器（含管理员服务器）
+    auto_join_servers = db.scalars(
+        select(Server).where(Server.auto_join == True).order_by(Server.join_order)
+    ).all()
     admin_server = get_or_create_admin_server(db)
-    existing_member = db.scalar(
-        select(ServerMember).where(
-            ServerMember.server_id == admin_server.id,
-            ServerMember.user_id == user.id,
+    # 确保管理员服务器也在列表中
+    auto_join_ids = {s.id for s in auto_join_servers}
+    all_servers = list(auto_join_servers)
+    if admin_server.id not in auto_join_ids:
+        all_servers.insert(0, admin_server)
+
+    for server in all_servers:
+        existing = db.scalar(
+            select(ServerMember).where(
+                ServerMember.server_id == server.id,
+                ServerMember.user_id == user.id,
+            )
         )
-    )
-    if existing_member is None:
-        db.add(ServerMember(server_id=admin_server.id, user_id=user.id, role="member"))
+        if existing is None:
+            db.add(ServerMember(
+                server_id=server.id,
+                user_id=user.id,
+                role="member",
+                position=server.join_order,
+            ))
 
     db.commit()
     db.refresh(user)

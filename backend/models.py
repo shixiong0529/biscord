@@ -41,6 +41,8 @@ class Server(Base):
     icon_url: Mapped[str | None] = mapped_column(String(256), nullable=True)
     description: Mapped[str | None] = mapped_column(String(256), nullable=True)
     is_recommended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    auto_join: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    join_order: Mapped[int] = mapped_column(Integer, nullable=False, default=999, server_default="999")
     join_policy: Mapped[str] = mapped_column(String(16), nullable=False, default="approval", server_default="approval")
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
@@ -107,6 +109,7 @@ class ServerMember(Base):
     server_id: Mapped[int] = mapped_column(ForeignKey("servers.id"), nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="member", server_default="member")
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=999, server_default="999")
     joined_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     server: Mapped["Server"] = relationship(back_populates="members")

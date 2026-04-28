@@ -189,6 +189,8 @@ class AdminServerSchema(BaseModel):
     owner_username: str = ""
     owner_display_name: str = ""
     mods: list[str] = []
+    auto_join: bool = False
+    join_order: int = 999
 
 
 class ReportSchema(BaseModel):

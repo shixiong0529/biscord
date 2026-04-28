@@ -70,6 +70,13 @@ def ensure_schema_compatibility() -> None:
             connection.execute(text("ALTER TABLE servers ADD COLUMN is_recommended BOOLEAN NOT NULL DEFAULT false"))
         if "join_policy" not in server_columns:
             connection.execute(text("ALTER TABLE servers ADD COLUMN join_policy VARCHAR(16) NOT NULL DEFAULT 'approval'"))
+        if "auto_join" not in server_columns:
+            connection.execute(text("ALTER TABLE servers ADD COLUMN auto_join BOOLEAN NOT NULL DEFAULT false"))
+        if "join_order" not in server_columns:
+            connection.execute(text("ALTER TABLE servers ADD COLUMN join_order INTEGER NOT NULL DEFAULT 999"))
+        member_columns = {column["name"] for column in inspector.get_columns("server_members")} if inspector.has_table("server_members") else set()
+        if "position" not in member_columns:
+            connection.execute(text("ALTER TABLE server_members ADD COLUMN position INTEGER NOT NULL DEFAULT 999"))
         user_columns = {column["name"] for column in inspector.get_columns("users")} if inspector.has_table("users") else set()
         if "avatar_url" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(256)"))
