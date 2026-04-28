@@ -45,53 +45,56 @@ function ServerRail({
 }) {
   const [menu, setMenu] = useState(null);
   const [localServers, setLocalServers] = React.useState(servers);
+  const [dragId, setDragId] = React.useState(null);
   const dragIdRef = React.useRef(null);
   const localServersRef = React.useRef(localServers);
-  const [dragId, setDragId] = React.useState(null);
 
   React.useEffect(() => { setLocalServers(servers); }, [servers]);
   React.useEffect(() => { localServersRef.current = localServers; }, [localServers]);
 
   function startDrag(e, id) {
     if (e.button !== 0) return;
+    e.preventDefault();
     dragIdRef.current = id;
     setDragId(id);
-  }
 
-  function handleRailPointerMove(e) {
-    if (!dragIdRef.current) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el) return;
-    const pill = el.closest('[data-sid]');
-    if (!pill) return;
-    const targetId = parseInt(pill.dataset.sid);
-    if (!targetId || targetId === dragIdRef.current) return;
-    const dragged = dragIdRef.current;
-    setLocalServers(prev => {
-      const from = prev.findIndex(s => s.id === dragged);
-      const to = prev.findIndex(s => s.id === targetId);
-      if (from < 0 || to < 0) return prev;
-      const next = [...prev];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
-    });
-  }
+    function onMove(ev) {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      if (!el) return;
+      const pill = el.closest('[data-sid]');
+      if (!pill) return;
+      const targetId = parseInt(pill.dataset.sid);
+      if (!targetId || targetId === dragIdRef.current) return;
+      const dragged = dragIdRef.current;
+      setLocalServers(prev => {
+        const from = prev.findIndex(s => s.id === dragged);
+        const to = prev.findIndex(s => s.id === targetId);
+        if (from < 0 || to < 0) return prev;
+        const next = [...prev];
+        const [item] = next.splice(from, 1);
+        next.splice(to, 0, item);
+        return next;
+      });
+    }
 
-  function endDrag() {
-    if (!dragIdRef.current) return;
-    dragIdRef.current = null;
-    setDragId(null);
-    const ids = localServersRef.current.filter(s => !s.kind && s.id !== 'divider' && s.id !== 'divider2').map(s => s.id);
-    API.patch('/api/servers/reorder', { order: ids }).catch(() => {});
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      dragIdRef.current = null;
+      setDragId(null);
+      const ids = localServersRef.current
+        .filter(s => !s.kind && s.id !== 'divider' && s.id !== 'divider2')
+        .map(s => s.id);
+      API.patch('/api/servers/reorder', { order: ids }).catch(() => {});
+    }
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   }
 
   return (
     <div className="server-rail">
-      <div className="server-rail-scroll"
-           onPointerMove={handleRailPointerMove}
-           onPointerUp={endDrag}
-           onPointerCancel={endDrag}>
+      <div className="server-rail-scroll">
       {localServers.map((s, i) => {
         if (s.id === 'divider' || s.id === 'divider2') return <div key={i} className="server-divider" />;
         const active = activeServer === s.id;
@@ -101,9 +104,9 @@ function ServerRail({
           <div key={s.id} className={`server-pill ${active ? 'active' : ''}`}
                data-sid={isDraggable ? s.id : undefined}
                style={{ opacity: isDragging ? 0.5 : 1, cursor: isDraggable ? (dragId ? 'grabbing' : 'grab') : 'pointer', transition: 'opacity 0.1s' }}
-               onPointerDown={isDraggable ? e => startDrag(e, s.id) : undefined}
+               onMouseDown={isDraggable ? e => startDrag(e, s.id) : undefined}
                onClick={() => {
-                 if (dragIdRef.current) return;
+                 if (dragId) return;
                  if (s.kind === 'add') return onAdd();
                  onSelect(s.id);
                }}
