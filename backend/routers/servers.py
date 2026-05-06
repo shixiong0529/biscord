@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import json
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from auth import get_current_user
 from database import get_db
-from models import Channel, ChannelGroup, DirectMessage, Friendship, Invite, JoinRequest, Message, PinnedMessage, Reaction, Server, ServerMember, User
+from models import Bot, Channel, ChannelGroup, DirectMessage, Friendship, Invite, JoinRequest, Message, PinnedMessage, Reaction, Server, ServerMember, User
 from routers.websocket import manager
 from schemas import (
     ChannelCreateRequest,
@@ -546,12 +547,38 @@ def reject_join_request(
 @router.get("/{server_id}/members")
 def list_members(server_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     require_member(db, server_id, current_user.id)
+    server = db.get(Server, server_id)
     members = db.scalars(
         select(ServerMember)
         .where(ServerMember.server_id == server_id)
         .options(selectinload(ServerMember.user))
         .order_by(ServerMember.role, ServerMember.joined_at)
     ).all()
+    bot_users = [member.user for member in members if member.user.is_bot]
+    bot_user_ids = [user.id for user in bot_users]
+    bot_usernames = [user.username for user in bot_users]
+    bots = db.scalars(
+        select(Bot).where((Bot.user_id.in_(bot_user_ids)) | (Bot.username.in_(bot_usernames)))
+    ).all() if bot_users else []
+    bot_by_user_id = {bot.user_id: bot for bot in bots if bot.user_id}
+    bot_by_username = {bot.username: bot for bot in bots}
+
+    def bot_for_user(user: User) -> Bot | None:
+        return bot_by_user_id.get(user.id) or bot_by_username.get(user.username)
+
+    def bot_channel_ids(user: User) -> list[int]:
+        bot = bot_for_user(user)
+        if not bot:
+            return []
+        try:
+            return json.loads(bot.channel_ids or "[]")
+        except Exception:
+            return []
+
+    def bot_is_running(user: User) -> bool:
+        bot = bot_for_user(user)
+        return bool(bot and bot.is_active)
+
     return [
         {
             "id": member.id,
@@ -567,6 +594,14 @@ def list_members(server_id: int, current_user: User = Depends(get_current_user),
                 "bio": member.user.bio,
                 "pronouns": member.user.pronouns,
                 "is_bot": member.user.is_bot,
+                "bot_channel_ids": bot_channel_ids(member.user) if member.user.is_bot else [],
+                "bot_is_running": bot_is_running(member.user) if member.user.is_bot else False,
+                "bot_auto_listens_current_server": bool(
+                    member.user.is_bot
+                    and not bot_channel_ids(member.user)
+                    and server
+                    and "管理员" in server.name
+                ),
                 "created_at": member.user.created_at,
             },
         }

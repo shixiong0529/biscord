@@ -699,7 +699,7 @@ async def stop_bot(bot_id: int, admin: User = Depends(require_admin), db: Sessio
 
 @router.get("/bots/{bot_id}/available-channels")
 def get_available_channels(bot_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    """Return all text channels grouped by server, for channel assignment UI."""
+    """Return text channels grouped by server, for bot channel assignment UI."""
     bot = db.get(Bot, bot_id)
     if bot is None:
         raise HTTPException(status_code=404, detail="bot not found")
@@ -715,6 +715,6 @@ def get_available_channels(bot_id: int, admin: User = Depends(require_admin), db
             result.append({
                 "server_id": srv.id,
                 "server_name": srv.name,
-                "channels": [{"id": ch.id, "name": ch.name} for ch in channels],
+                "channels": [{"id": ch.id, "name": ch.name, "kind": ch.kind} for ch in channels],
             })
     return result

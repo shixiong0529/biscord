@@ -197,11 +197,11 @@ const NAV = [
   { id: 'dashboard', label: '📊 概览' },
   { id: 'users', label: '👤 用户管理' },
   { id: 'servers', label: '🏠 服务器管理' },
+  { id: 'bots', label: '🤖 机器人' },
   { id: 'reports', label: '🚨 举报队列' },
   { id: 'invites', label: '🔗 邀请码' },
   { id: 'join-requests', label: '📋 加入申请' },
   { id: 'audit-logs', label: '📜 操作日志' },
-  { id: 'bots', label: '🤖 机器人' },
 ];
 
 function AdminSidebar({ page, onNav, onLogout, adminUser }) {

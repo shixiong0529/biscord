@@ -1652,6 +1652,25 @@ body {
   color: var(--ink-1);
 }
 .member-item:hover { background: var(--paper-2); color: var(--ink-0); }
+.member-item.bot-member {
+  background: rgba(181, 88, 58, 0.08);
+  border-left: 2px solid var(--rust);
+  color: var(--rust);
+  font-weight: 700;
+}
+.member-item.bot-member:hover {
+  background: rgba(181, 88, 58, 0.14);
+  color: var(--rust);
+}
+.member-item.bot-member.bot-stopped {
+  background: rgba(127, 116, 102, 0.08);
+  border-left-color: var(--ink-2);
+  color: var(--ink-2);
+}
+.member-item.bot-member.bot-stopped:hover {
+  background: rgba(127, 116, 102, 0.14);
+  color: var(--ink-1);
+}
 .member-item .avatar {
   width: 28px; height: 28px; border-radius: 50%;
   position: relative; flex-shrink: 0;
@@ -1677,7 +1696,7 @@ body {
 /* Role tinted names */
 .role-founder { color: var(--rust); }
 .role-editor { color: var(--plum); }
-.role-bot { color: #e06c75; }
+.role-bot { color: var(--rust); }
 .role-mod { color: var(--teal); }
 
 /* ==============================

@@ -397,7 +397,7 @@ function MemberSidebar({ members, onOpenMember }) {
           {group.items.map(m => (
             <div
               key={m.id}
-              className={`member-item ${m.status === 'offline' ? 'offline' : ''}`}
+              className={`member-item ${m.status === 'offline' ? 'offline' : ''} ${m.isBot ? 'bot-member' : ''} ${m.isBot && !m.botIsRunning ? 'bot-stopped' : ''}`}
               onClick={(e) => onOpenMember(m, e)}
             >
               <div className={`avatar ${m.avatar_url ? '' : m.color}`} style={{ position: 'relative' }}>

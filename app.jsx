@@ -519,9 +519,16 @@ function App() {
           status: m.user.status || 'offline',
           bio: m.user.bio || '',
           pronouns: m.user.pronouns || 'private',
+          botChannelIds: (m.user.bot_channel_ids || []).map(id => Number(id)),
+          botIsRunning: Boolean(m.user.bot_is_running),
+          botAutoListensCurrentServer: Boolean(m.user.bot_auto_listens_current_server),
           activity: m.user.bio || '',
         }));
-        const bots = mapped.filter(m => m.isBot && m.status !== 'offline');
+        const bots = mapped.filter(m => m.isBot).map(m => ({
+          ...m,
+          status: m.botIsRunning ? 'online' : 'offline',
+          activity: '',
+        }));
         const founders = mapped.filter(m => !m.isBot && m.role === 'founder' && m.status === 'online');
         const online = mapped.filter(m => !m.isBot && m.role !== 'founder' && m.status === 'online');
         const dnd = mapped.filter(m => !m.isBot && m.status === 'dnd');
@@ -558,6 +565,20 @@ function App() {
   }, [activeServerId, activeChannel?.id]);
 
   const channelKey = isDM ? 'dm:' + activeDMId : activeServerId + '/' + activeChannel?.id;
+  const visibleServerMembers = useMemo(() => (
+    (serverMembers || [])
+      .map(group => ({
+        ...group,
+        items: (group.items || []).filter(member => {
+          if (!member.isBot) return true;
+          if (!activeChannel?.id || activeChannel.kind !== 'text') return false;
+          if (member.botChannelIds?.includes(activeChannel.id)) return true;
+          return Boolean(member.botAutoListensCurrentServer);
+        }),
+      }))
+      .filter(group => group.items.length)
+  ), [serverMembers, activeChannel?.id, activeChannel?.kind]);
+
   useEffectApp(function loadChannelMessages() {
     if (authStatus !== 'authenticated' || isDM || !activeChannel?.id || typeof activeChannel.id !== 'number') return;
     let cancelled = false;
@@ -1124,7 +1145,7 @@ function App() {
         />
       )}
 
-      {!isDM && showMembers && <MemberSidebar members={serverMembers} onOpenMember={handleOpenMember}/>}
+      {!isDM && showMembers && <MemberSidebar members={visibleServerMembers} onOpenMember={handleOpenMember}/>}
 
       {createOpen && (
         <CreateServerModal
