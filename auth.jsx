@@ -255,7 +255,7 @@ function RegisterPane({ active, loading, error, onRegister }) {
       <div className="field">
         <label>密码</label>
         <div style={{ position: "relative" }}>
-          <input className="input" type={showP ? "text" : "password"} style={{ width: "100%", paddingRight: 40 }} placeholder="至少 6 位" value={p} onChange={(e) => setP(e.target.value)} />
+          <input className="input" type={showP ? "text" : "password"} style={{ width: "100%", paddingRight: 40 }} placeholder="至少 6 位" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" />
           <EyeBtn show={showP} onToggle={() => setShowP(v => !v)} />
         </div>
       </div>
