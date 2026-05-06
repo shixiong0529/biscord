@@ -15,6 +15,7 @@ class UserSchema(BaseModel):
     avatar_url: str | None = None
     status: str
     bio: str | None = None
+    pronouns: str = "private"
     created_at: datetime | None = None
     is_bot: bool = False
     is_admin: bool = False
@@ -150,9 +151,15 @@ class OkResponse(BaseModel):
 class UserUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=32)
     bio: str | None = Field(default=None, max_length=256)
+    pronouns: str | None = Field(default=None, pattern=r"^(man|woman|private)$")
     status: str | None = Field(default=None, pattern=r"^(online|idle|dnd|offline)$")
     avatar_color: str | None = Field(default=None, pattern=r"^av-[1-8]$")
     avatar_url: str | None = Field(default=None, max_length=256)
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=6, max_length=128)
 
 
 class TelegramNotifyUpdate(BaseModel):

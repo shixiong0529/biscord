@@ -17,6 +17,7 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(256), nullable=True, default=None)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="online", server_default="online")
     bio: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    pronouns: Mapped[str] = mapped_column(String(16), nullable=False, default="private", server_default="private")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     # Telegram notification fields (per-user bot token model)
     telegram_bot_token: Mapped[str | None] = mapped_column(String(128), nullable=True, default=None)

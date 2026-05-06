@@ -463,6 +463,7 @@ function App() {
       avatar_url: currentUser.avatar_url || null,
       status: currentUser.status || 'online',
       bio: currentUser.bio,
+      pronouns: currentUser.pronouns || 'private',
       is_admin: currentUser.is_admin || false,
     };
   }, [currentUser]);
@@ -516,6 +517,8 @@ function App() {
           role: m.user.is_bot ? 'bot' : m.role,
           isBot: m.user.is_bot || false,
           status: m.user.status || 'offline',
+          bio: m.user.bio || '',
+          pronouns: m.user.pronouns || 'private',
           activity: m.user.bio || '',
         }));
         const bots = mapped.filter(m => m.isBot && m.status !== 'offline');
@@ -826,8 +829,20 @@ function App() {
 
   const handleOpenSelf = (e) => {
     const rect = e?.currentTarget?.getBoundingClientRect?.();
+    const activeRole = typeof activeServerId === 'number' ? activeServer?.role : '';
     setProfileCard({
-      member: { id: 'u-self', name: currentUserDisplay.name, color: currentUserDisplay.color, avatar_url: currentUserDisplay.avatar_url, status: currentUserDisplay.status, role: 'founder' },
+      member: {
+        id: 'u-' + currentUserDisplay.id,
+        username: currentUser?.username,
+        handle: currentUserDisplay.handle,
+        name: currentUserDisplay.name,
+        color: currentUserDisplay.color,
+        avatar_url: currentUserDisplay.avatar_url,
+        status: currentUserDisplay.status,
+        role: activeRole || '',
+        bio: currentUserDisplay.bio || '',
+        pronouns: currentUserDisplay.pronouns || 'private',
+      },
       position: rect ? { x: rect.right + 12, y: rect.top - 300 } : { x: 200, y: 200 },
     });
   };
@@ -1636,7 +1651,7 @@ function InlineDMSidebar({ activeDM, activeView, onSelect, dmList = [], friendRe
         </div>
         {dmList.length === 0 && (
           <div style={{ padding: '10px 14px', color: 'var(--ink-2)', fontSize: 12, lineHeight: 1.5 }}>
-            暂无私信。可以从服务器成员资料卡里点击 Message 开始对话。
+            暂无私信。可以从服务器成员资料卡里点击“私信”开始对话。
           </div>
         )}
         {dmList.map(dm => (

@@ -150,6 +150,8 @@ def ensure_schema_compatibility() -> None:
         user_columns = {column["name"] for column in inspector.get_columns("users")} if inspector.has_table("users") else set()
         if "avatar_url" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(256)"))
+        if "pronouns" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN pronouns VARCHAR(16) NOT NULL DEFAULT 'private'"))
         for table in (JoinRequest.__table__, FriendRequest.__table__, Friendship.__table__):
             table.create(bind=connection, checkfirst=True)
         recommended = {

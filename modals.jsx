@@ -1385,6 +1385,21 @@ function ConfirmLeaveServerModal({ server, onClose, onConfirm }) {
 
 /* Profile card popover, positioned by caller */
 function ProfileCard({ member, position, onClose, onOpenDM }) {
+  const roleLabels = {
+    founder: '创建者',
+    mod: '管理员',
+    member: '成员',
+    bot: '机器人',
+  };
+  const pronounLabels = {
+    man: '男人',
+    woman: '女人',
+    private: '隐私',
+  };
+  const handle = member.handle || (member.username ? '@' + member.username : `@${member.id ? String(member.id).replace('u-', '') : 'member'}`);
+  const roleLabel = roleLabels[member.role] || '';
+  const pronounLabel = member.pronouns && member.pronouns !== 'private' ? pronounLabels[member.pronouns] : '';
+  const profileMeta = [roleLabel, pronounLabel].filter(Boolean).join(' · ');
   const style = {
     position: 'fixed',
     left: Math.min(position.x, window.innerWidth - 340),
@@ -1407,48 +1422,30 @@ function ProfileCard({ member, position, onClose, onOpenDM }) {
             {member.avatar_url && <img src={API.assetUrl(member.avatar_url)} alt={member.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />}
             <span className={`status-dot ${member.status || 'online'}`}/>
           </div>
-          <button className="btn btn-secondary" onClick={() => { onOpenDM(member); onClose(); }}>Message</button>
+          <button className="btn btn-secondary" onClick={() => { onOpenDM(member); onClose(); }}>私信</button>
         </div>
         <div className="profile-body">
           <div className={`name ${member.role ? 'role-'+member.role : ''}`}>{member.name}</div>
-          <div className="handle">@{member.id ? member.id.replace('u-', '') : 'member'} · {member.role || 'Member'}</div>
+          <div className="handle">{handle}{profileMeta ? ` · ${profileMeta}` : ''}</div>
 
           <div className="profile-section">
-            <div className="label">About · 关于</div>
+            <div className="label">关于</div>
             <div className="content">
-              {member.role === 'founder' && '每周五主持读书会。相信慢慢读一本书比快速读十本更靠近文学。'}
-              {member.role === 'editor' && '负责本月共读的整理。最近在做《漂流教室》的注解合集。'}
-              {member.role === 'bot' && '小小图书管理员。type /find <keyword> to search within pinned notes.'}
-              {member.role === 'mod' && '社区小管家 · 有事 @ 我。'}
-              {!member.role && '潜水中，偶尔冒泡。'}
+              {member.bio || '还没有填写自我介绍。'}
             </div>
           </div>
 
-          <div className="profile-section">
-            <div className="label">Roles · 身份</div>
-            <div className="profile-roles">
-              {member.role && (
+          {member.role && (
+            <div className="profile-section">
+              <div className="label">身份</div>
+              <div className="profile-roles">
                 <span className="profile-role">
-                  <span className="dot" style={{ background: `var(--${member.role === 'founder' ? 'rust' : member.role === 'editor' ? 'plum' : member.role === 'bot' ? 'sage' : 'teal'})` }}/>
-                  {member.role}
+                  <span className="dot" style={{ background: `var(--${member.role === 'founder' ? 'rust' : member.role === 'bot' ? 'sage' : 'teal'})` }}/>
+                  {roleLabel || member.role}
                 </span>
-              )}
-              <span className="profile-role">
-                <span className="dot" style={{ background: 'var(--sage)' }}/>
-                reader
-              </span>
-              {member.role !== 'bot' && (
-                <span className="profile-role">
-                  <span className="dot" style={{ background: 'var(--amber)' }}/>
-                  2025 class
-                </span>
-              )}
+              </div>
             </div>
-          </div>
-
-          <div className="profile-note">
-            Click to add a private note about {member.name}…
-          </div>
+          )}
         </div>
       </div>
     </>
@@ -1470,10 +1467,29 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
   const [avatarUploading, setAvatarUploading] = useStateM(false);
   const [avatarError, setAvatarError] = useStateM('');
   const [nameSaved, setNameSaved] = useStateM(false);
+  const [passwordOpen, setPasswordOpen] = useStateM(false);
+  const [currentPassword, setCurrentPassword] = useStateM('');
+  const [newPassword, setNewPassword] = useStateM('');
+  const [confirmPassword, setConfirmPassword] = useStateM('');
+  const [passwordSaving, setPasswordSaving] = useStateM(false);
+  const [passwordError, setPasswordError] = useStateM('');
+  const [passwordSaved, setPasswordSaved] = useStateM(false);
+  const [profileBio, setProfileBio] = useStateM('');
+  const [profilePronouns, setProfilePronouns] = useStateM('private');
+  const [profileSaving, setProfileSaving] = useStateM(false);
+  const [profileError, setProfileError] = useStateM('');
+  const [profileSaved, setProfileSaved] = useStateM(false);
 
   useEffectM(() => {
     if (user?.name) setDisplayName(user.name);
   }, [user?.name, section]);
+
+  useEffectM(() => {
+    setProfileBio(user?.bio || '');
+    setProfilePronouns(user?.pronouns || 'private');
+    setProfileError('');
+    setProfileSaved(false);
+  }, [user?.bio, user?.pronouns, section]);
 
   const handleAvatarUpload = async (file) => {
     if (!file) return;
@@ -1505,6 +1521,74 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
       setNameError(err.message || '保存失败');
     } finally {
       setNameSaving(false);
+    }
+  };
+
+  const closePasswordModal = () => {
+    if (passwordSaving) return;
+    setPasswordOpen(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+  };
+
+  const handleChangePassword = async () => {
+    if (passwordSaving) return;
+    setPasswordError('');
+    setPasswordSaved(false);
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('请填写所有密码字段');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('新密码至少需要 6 位');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('两次输入的新密码不一致');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await API.patch('/api/users/me/password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setPasswordSaved(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        setPasswordSaved(false);
+        setPasswordOpen(false);
+      }, 900);
+    } catch (err) {
+      setPasswordError(err.message || '密码更新失败');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (profileSaving) return;
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileSaved(false);
+    try {
+      const updated = await API.patch('/api/users/me', {
+        bio: profileBio.trim() || null,
+        pronouns: profilePronouns,
+      });
+      onUserUpdate?.(updated);
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2000);
+    } catch (err) {
+      setProfileError(err.message || '保存失败');
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -1752,6 +1836,10 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
                 <div style={{ fontSize: 15, marginTop: 4, fontFamily: 'var(--ff-mono)', color: 'var(--ink-1)' }}>{user.handle}</div>
               </div>
             </div>
+
+            <div className="settings-section">
+              <button className="btn btn-primary" onClick={() => setPasswordOpen(true)}>修改密码</button>
+            </div>
           </>
         )}
 
@@ -1764,11 +1852,30 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
             <div className="settings-section">
               <label className="form-label">自我介绍</label>
               <textarea className="form-input" style={{ height: 80, padding: 12, lineHeight: 1.5 }}
-                defaultValue="工作日在做事，晚上读闲书。"/>
+                value={profileBio}
+                maxLength={256}
+                onChange={e => { setProfileBio(e.target.value); setProfileError(''); setProfileSaved(false); }}/>
+              <div className="form-hint">{profileBio.length}/256</div>
             </div>
             <div className="settings-section">
               <label className="form-label">代词</label>
-              <input className="form-input" defaultValue="她/她" style={{ width: 200 }}/>
+              <select
+                className="form-input"
+                value={profilePronouns}
+                onChange={e => { setProfilePronouns(e.target.value); setProfileError(''); setProfileSaved(false); }}
+                style={{ width: 200 }}
+              >
+                <option value="man">男人</option>
+                <option value="woman">女人</option>
+                <option value="private">隐私</option>
+              </select>
+            </div>
+            {profileError && <div style={{ color: 'var(--rust)', fontSize: 13, marginTop: 10 }}>{profileError}</div>}
+            {profileSaved && <div style={{ color: 'var(--sage)', fontSize: 13, marginTop: 10 }}>已保存</div>}
+            <div className="settings-row" style={{ justifyContent: 'flex-end', marginTop: 20 }}>
+              <button className="btn btn-primary" onClick={handleSaveProfile} disabled={profileSaving}>
+                {profileSaving ? '保存中…' : '确定'}
+              </button>
             </div>
           </>
         )}
@@ -1942,6 +2049,57 @@ function Settings({ onClose, theme, setTheme, accent, setAccent, density, setDen
         <Icon name="close" size={16}/>
       </button>
       </div>
+
+      {passwordOpen && (
+        <div className="settings-password-backdrop" onClick={closePasswordModal}>
+          <div className="settings-password-modal" onClick={e => e.stopPropagation()}>
+            <button className="settings-password-close" onClick={closePasswordModal}>
+              <Icon name="close" size={24}/>
+            </button>
+            <h2>更新密码</h2>
+            <p>输入当前密码和新密码。</p>
+
+            <label className="form-label">当前密码 <span>*</span></label>
+            <input
+              className="form-input settings-password-input"
+              type="password"
+              value={currentPassword}
+              onChange={e => { setCurrentPassword(e.target.value); setPasswordError(''); }}
+              autoFocus
+              autoComplete="current-password"
+            />
+
+            <label className="form-label">新密码 <span>*</span></label>
+            <input
+              className="form-input settings-password-input"
+              type="password"
+              value={newPassword}
+              onChange={e => { setNewPassword(e.target.value); setPasswordError(''); }}
+              autoComplete="new-password"
+            />
+
+            <label className="form-label">确认新密码 <span>*</span></label>
+            <input
+              className="form-input settings-password-input"
+              type="password"
+              value={confirmPassword}
+              onChange={e => { setConfirmPassword(e.target.value); setPasswordError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleChangePassword()}
+              autoComplete="new-password"
+            />
+
+            {passwordError && <div className="settings-password-error">{passwordError}</div>}
+            {passwordSaved && <div className="settings-password-success">密码已更新</div>}
+
+            <div className="settings-password-actions">
+              <button className="btn btn-secondary" onClick={closePasswordModal} disabled={passwordSaving}>取消</button>
+              <button className="btn btn-primary" onClick={handleChangePassword} disabled={passwordSaving}>
+                {passwordSaving ? '保存中…' : '完成'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
