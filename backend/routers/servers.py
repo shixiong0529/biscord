@@ -132,6 +132,7 @@ def user_to_dict(user: User) -> dict:
         "avatar_url": user.avatar_url,
         "status": user.status,
         "bio": user.bio,
+        "is_bot": user.is_bot,
         "created_at": user.created_at,
     }
 
@@ -564,6 +565,7 @@ def list_members(server_id: int, current_user: User = Depends(get_current_user),
                 "avatar_url": member.user.avatar_url,
                 "status": member.user.status,
                 "bio": member.user.bio,
+                "is_bot": member.user.is_bot,
                 "created_at": member.user.created_at,
             },
         }
