@@ -102,7 +102,7 @@ const from = prev.findIndex(s => s.id === dragged);
     <div className="server-rail">
       <div className="server-rail-scroll">
       {localServers.map((s, i) => {
-        if (s.id === 'divider' || s.id === 'divider2') return <div key={i} className="server-divider" />;
+        if (s.id === 'divider' || s.id === 'divider2') return <div key={s.id} className="server-divider" />;
         const active = activeServer === s.id;
         const isDraggable = !s.kind && typeof s.id === 'number';
         const isDragging = dragId === s.id;

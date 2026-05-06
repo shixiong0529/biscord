@@ -6,7 +6,9 @@ load_dotenv()
 BOT_USERNAME = os.environ["BOT_USERNAME"]
 BOT_PASSWORD = os.environ["BOT_PASSWORD"]
 BOT_DISPLAY_NAME = os.environ["BOT_DISPLAY_NAME"]
-DEEPSEEK_API_KEY = os.environ["DEEPSEEK_API_KEY"]
+LLM_API_KEY  = os.environ["LLM_API_KEY"]
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.deepseek.com")
+LLM_MODEL    = os.environ.get("LLM_MODEL", "deepseek-chat")
 API_BASE = os.environ.get("API_BASE", "http://localhost:8000")
 WS_BASE = API_BASE.replace("http://", "ws://").replace("https://", "wss://")
 CHANNEL_IDS = [int(x) for x in os.environ.get("CHANNEL_IDS", "").split(",") if x.strip()]

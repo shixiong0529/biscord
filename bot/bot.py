@@ -12,7 +12,8 @@ from openai import AsyncOpenAI
 from config import (
     API_BASE, WS_BASE,
     BOT_USERNAME, BOT_PASSWORD, BOT_DISPLAY_NAME,
-    DEEPSEEK_API_KEY, CHANNEL_IDS, HISTORY_LIMIT, SYSTEM_PROMPT,
+    LLM_API_KEY, LLM_BASE_URL, LLM_MODEL,
+    CHANNEL_IDS, HISTORY_LIMIT, SYSTEM_PROMPT,
 )
 
 logging.basicConfig(
@@ -23,7 +24,7 @@ log = logging.getLogger("bot")
 
 _state: dict = {"access_token": None, "refresh_token": None, "user_id": None}
 
-deepseek = AsyncOpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
+llm = AsyncOpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
 
 # 每个频道独立的对话历史 {channel_id: [{"role": ..., "content": ...}]}
 histories: dict[int, list] = {}
@@ -74,8 +75,8 @@ async def ask_deepseek(channel_id: int, user_display: str, question: str) -> str
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + hist
     try:
-        resp = await deepseek.chat.completions.create(
-            model="deepseek-chat",
+        resp = await llm.chat.completions.create(
+            model=LLM_MODEL,
             messages=messages,
             max_tokens=1024,
         )

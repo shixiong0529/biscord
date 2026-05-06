@@ -2,6 +2,8 @@ import json
 import os
 from datetime import datetime, timezone
 
+_API_BASE = os.getenv("API_BASE", "http://localhost:8000")
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, func, select, update as sa_update
@@ -488,11 +490,10 @@ def list_audit_logs(
 def _bot_is_running(bot_id: int) -> bool:
     from bot_runner import running_bots
     r = running_bots.get(bot_id)
-    return r is not None and r._task is not None and not r._task.done()
+    return r is not None and r.is_running()
 
 
 def _ensure_user_for_bot(bot: Bot, db: Session) -> None:
-    """Create or update the User account for this bot."""
     if bot.user_id:
         user = db.get(User, bot.user_id)
         if user:
@@ -500,11 +501,11 @@ def _ensure_user_for_bot(bot: Bot, db: Session) -> None:
             user.password_hash = hash_password(bot.password)
             db.flush()
             return
-    existing = db.scalar(select(User).where(User.username == bot.username))
-    if existing:
-        existing.display_name = bot.display_name
-        existing.password_hash = hash_password(bot.password)
-        bot.user_id = existing.id
+    user = db.scalar(select(User).where(User.username == bot.username))
+    if user:
+        user.display_name = bot.display_name
+        user.password_hash = hash_password(bot.password)
+        bot.user_id = user.id
         db.flush()
         return
     user = User(
@@ -517,31 +518,44 @@ def _ensure_user_for_bot(bot: Bot, db: Session) -> None:
     db.add(user)
     db.flush()
     bot.user_id = user.id
-    # Auto-join all auto_join servers
-    for srv in db.scalars(select(Server).where(Server.auto_join == True).order_by(Server.join_order)).all():
-        if not db.scalar(select(ServerMember).where(ServerMember.server_id == srv.id, ServerMember.user_id == user.id)):
+    auto_join_servers = db.scalars(
+        select(Server).where(Server.auto_join == True).order_by(Server.join_order)
+    ).all()
+    existing_ids = {
+        sm.server_id for sm in db.scalars(
+            select(ServerMember).where(
+                ServerMember.user_id == user.id,
+                ServerMember.server_id.in_([s.id for s in auto_join_servers]),
+            )
+        ).all()
+    }
+    for srv in auto_join_servers:
+        if srv.id not in existing_ids:
             db.add(ServerMember(server_id=srv.id, user_id=user.id, role="member"))
     db.flush()
 
 
 def _ensure_bot_server_memberships(bot: Bot, db: Session) -> None:
-    """Join the bot user into every server that contains an assigned channel."""
     if not bot.user_id:
         return
     try:
         channel_ids = json.loads(bot.channel_ids or "[]")
     except Exception:
         return
-    for ch_id in channel_ids:
-        ch = db.get(Channel, ch_id)
-        if ch is None:
-            continue
-        exists = db.scalar(select(ServerMember).where(
-            ServerMember.server_id == ch.server_id,
-            ServerMember.user_id == bot.user_id,
-        ))
-        if not exists:
-            db.add(ServerMember(server_id=ch.server_id, user_id=bot.user_id, role="member"))
+    if not channel_ids:
+        return
+    channels = db.scalars(select(Channel).where(Channel.id.in_(channel_ids))).all()
+    server_ids = {ch.server_id for ch in channels}
+    existing = {
+        sm.server_id for sm in db.scalars(
+            select(ServerMember).where(
+                ServerMember.user_id == bot.user_id,
+                ServerMember.server_id.in_(server_ids),
+            )
+        ).all()
+    }
+    for srv_id in server_ids - existing:
+        db.add(ServerMember(server_id=srv_id, user_id=bot.user_id, role="member"))
     db.flush()
 
 
@@ -612,7 +626,7 @@ async def update_bot(
     db.refresh(bot)
     if was_running:
         from bot_runner import running_bots, BotRunner
-        api_base = os.getenv("API_BASE", "http://localhost:8000")
+        api_base = _API_BASE
         runner = BotRunner(bot, api_base)
         running_bots[bot_id] = runner
         runner.start()
@@ -636,6 +650,10 @@ async def delete_bot(bot_id: int, admin: User = Depends(require_admin), db: Sess
     if bot.user_id:
         user = db.get(User, bot.user_id)
         if user:
+            user_msg_sub = select(Message.id).where(Message.author_id == user.id)
+            db.execute(sa_delete(Reaction).where(Reaction.message_id.in_(user_msg_sub)))
+            db.execute(sa_delete(PinnedMessage).where(PinnedMessage.message_id.in_(user_msg_sub)))
+            db.execute(sa_delete(Message).where(Message.author_id == user.id))
             db.execute(sa_delete(ServerMember).where(ServerMember.user_id == user.id))
             db.flush()
             db.delete(user)
@@ -655,7 +673,7 @@ async def start_bot(bot_id: int, admin: User = Depends(require_admin), db: Sessi
     from bot_runner import running_bots, BotRunner
     if bot_id in running_bots:
         await running_bots[bot_id].stop()
-    api_base = os.getenv("API_BASE", "http://localhost:8000")
+    api_base = _API_BASE
     runner = BotRunner(bot, api_base)
     running_bots[bot_id] = runner
     runner.start()

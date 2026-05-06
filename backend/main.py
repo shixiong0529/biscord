@@ -48,6 +48,17 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    from bot_runner import running_bots
+    for runner in list(running_bots.values()):
+        await runner.stop()
+    running_bots.clear()
+    # 取消所有以 bot_ 开头的孤儿任务（--reload 模块重载后残留的）
+    orphans = [t for t in asyncio.all_tasks() if t.get_name().startswith("bot_")]
+    for t in orphans:
+        t.cancel()
+    if orphans:
+        await asyncio.gather(*orphans, return_exceptions=True)
+
 
 app = FastAPI(title="Biscord API", version="0.1.0", lifespan=lifespan)
 
@@ -165,7 +176,8 @@ def no_store_file(path: Path) -> FileResponse:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["null", "http://localhost", "http://127.0.0.1"],
+    allow_origins=["null", "http://localhost", "http://127.0.0.1",
+                   *([o for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()])],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
