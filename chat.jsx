@@ -240,7 +240,7 @@ const EMOJI_CATEGORIES = [
   { label: '符号', icon: '🕯', emojis: ['🕯','💭','👀','🎉','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','💯','❗','❓','💬','🗨️','💤','♻️'] },
 ];
 
-function Composer({ channelName, onSend, error, typingText, members = [], sendMode = 'enter' }) {
+function Composer({ channelName, onSend, error, typingText, members = [], sendMode = 'enter', pendingMention }) {
   const [val, setVal] = useStateChat('');
   const [uploading, setUploading] = useStateChat(false);
   const [uploadError, setUploadError] = useStateChat('');
@@ -252,6 +252,12 @@ function Composer({ channelName, onSend, error, typingText, members = [], sendMo
   const fileRef = useRefChat(null);
   const stopTypingRef = useRefChat(null);
   const mentionOptions = members.slice(0, 8);
+
+  React.useEffect(() => {
+    if (!pendingMention?.name) return;
+    setVal(prev => (prev.endsWith(' ') || prev === '' ? prev : prev + ' ') + '@' + pendingMention.name + ' ');
+    ref.current?.focus();
+  }, [pendingMention?.ts]);
 
   const resizeComposer = (ta = ref.current) => {
     if (!ta) return;
@@ -592,7 +598,7 @@ function ThreadPanel({ rootMessage, replies, onClose, onSendReply }) {
   );
 }
 
-function ChatArea({ channel, messages, onSend, onToggleMembers, onOpenProfile, searchValue, setSearchValue, sendError, typingText, currentUser, currentRole, sendMode }) {
+function ChatArea({ channel, messages, onSend, onToggleMembers, onOpenProfile, searchValue, setSearchValue, sendError, typingText, currentUser, currentRole, sendMode, pendingMention }) {
   const scrollRef = useRefChat(null);
   const [pinsOpen, setPinsOpen] = useStateChat(false);
   const [pins, setPins] = useStateChat([]);
@@ -679,7 +685,7 @@ function ChatArea({ channel, messages, onSend, onToggleMembers, onOpenProfile, s
           onSendReply={(text, rootId) => onSend(text, { reply_to_id: rootId })}
         />
       )}
-      <Composer channelName={channel?.name || ''} onSend={onSend} error={sendError} typingText={typingText} members={members} sendMode={sendMode}/>
+      <Composer channelName={channel?.name || ''} onSend={onSend} error={sendError} typingText={typingText} members={members} sendMode={sendMode} pendingMention={pendingMention}/>
     </div>
   );
 }

@@ -810,7 +810,13 @@ function App() {
     });
   };
 
+  const [pendingMention, setPendingMention] = useStateApp(null);
+
   const handleOpenMember = (m, e) => {
+    if (m && m.name && !isDM) {
+      setPendingMention({ name: m.name, ts: Date.now() });
+      return;
+    }
     const rect = e?.currentTarget?.getBoundingClientRect?.();
     setProfileCard({
       member: m,
@@ -1099,6 +1105,7 @@ function App() {
           currentUser={currentUserDisplay}
           currentRole={activeServer?.role}
           sendMode={sendMode}
+          pendingMention={pendingMention}
         />
       )}
 
