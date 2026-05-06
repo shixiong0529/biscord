@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -9,6 +11,7 @@ from database import SessionLocal
 from models import Channel, ServerMember, User
 
 router = APIRouter(tags=["websocket"])
+log = logging.getLogger("websocket")
 
 
 class ConnectionManager:
@@ -90,7 +93,7 @@ def can_access_channel(user_id: int, channel_id: int) -> bool:
         return member is not None
 
 
-async def authenticate(websocket: WebSocket) -> User | None:
+async def authenticate(websocket: WebSocket, send_ok: bool = True) -> User | None:
     try:
         payload = await websocket.receive_json()
     except Exception:
@@ -109,21 +112,25 @@ async def authenticate(websocket: WebSocket) -> User | None:
         await websocket.close(code=1008)
         return None
 
-    await websocket.send_json({"type": "auth.ok", "data": {"user_id": user.id}})
+    if send_ok:
+        await websocket.send_json({"type": "auth.ok", "data": {"user_id": user.id}})
     return user
 
 
 @router.websocket("/ws/channel/{channel_id}")
 async def channel_socket(websocket: WebSocket, channel_id: int):
     await websocket.accept()
-    user = await authenticate(websocket)
+    user = await authenticate(websocket, send_ok=False)
     if user is None:
         return
     if not can_access_channel(user.id, channel_id):
+        log.warning("channel websocket forbidden: channel=%s user=%s username=%s", channel_id, user.id, user.username)
         await websocket.send_json({"type": "error", "detail": "forbidden"})
         await websocket.close(code=1008)
         return
 
+    await websocket.send_json({"type": "auth.ok", "data": {"user_id": user.id}})
+    log.info("channel websocket connected: channel=%s user=%s username=%s", channel_id, user.id, user.username)
     await manager.connect_channel(channel_id, websocket, user)
     try:
         while True:
@@ -139,6 +146,7 @@ async def channel_socket(websocket: WebSocket, channel_id: int):
                 },
             )
     except WebSocketDisconnect:
+        log.info("channel websocket disconnected: channel=%s user=%s username=%s", channel_id, user.id, user.username)
         await manager.disconnect_channel(channel_id, websocket)
 
 

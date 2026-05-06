@@ -42,9 +42,11 @@ async def lifespan(app: FastAPI):
     with _Session(engine) as _db:
         active_bots = _db.scalars(_select(Bot).where(Bot.is_active == True)).all()
         for bot_obj in active_bots:
+            admin_router._ensure_bot_server_memberships(bot_obj, _db)
             runner = BotRunner(bot_obj, api_base)
             running_bots[bot_obj.id] = runner
             runner.start()
+        _db.commit()
 
     yield
 

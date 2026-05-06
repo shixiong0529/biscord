@@ -204,6 +204,7 @@
     if (payload.type === 'dm.new') handlers.onDM(payload.data);
     if (payload.type && payload.type.startsWith('friend.')) handlers.onFriend(payload);
     if (payload.type === 'error') handlers.onError(payload);
+    return payload;
   }
 
   function scheduleReconnect() {
@@ -225,13 +226,40 @@
     activeSocket = socket;
     activeSocketConfig = config;
     manualDisconnect = false;
+    let stableTimer = null;
 
     socket.addEventListener('open', () => {
-      reconnectAttempt = 0;
+      if (socket !== activeSocket) return;
       socket.send(JSON.stringify({ type: 'auth', token }));
     });
-    socket.addEventListener('message', event => handleSocketEvent(event, handlers));
-    socket.addEventListener('close', scheduleReconnect);
+    socket.addEventListener('message', event => {
+      if (socket !== activeSocket) return;
+      const payload = handleSocketEvent(event, handlers);
+      if (payload?.type === 'auth.ok') {
+        if (stableTimer) window.clearTimeout(stableTimer);
+        stableTimer = window.setTimeout(() => {
+          reconnectAttempt = 0;
+          stableTimer = null;
+        }, 3000);
+      }
+      if (payload?.type === 'error' && ['unauthorized', 'forbidden'].includes(payload.detail)) {
+        manualDisconnect = true;
+        activeSocketConfig = null;
+      }
+    });
+    socket.addEventListener('close', event => {
+      if (socket !== activeSocket) return;
+      if (stableTimer) {
+        window.clearTimeout(stableTimer);
+        stableTimer = null;
+      }
+      if (event.code === 1008) {
+        manualDisconnect = true;
+        activeSocketConfig = null;
+        return;
+      }
+      scheduleReconnect();
+    });
     socket.addEventListener('error', () => handlers.onError({ type: 'error', detail: 'websocket error' }));
     return socket;
   }
@@ -255,13 +283,40 @@
     dmSocket = socket;
     dmSocketConfig = config;
     dmManualDisconnect = false;
+    let dmStableTimer = null;
 
     socket.addEventListener('open', () => {
-      dmReconnectAttempt = 0;
+      if (socket !== dmSocket) return;
       socket.send(JSON.stringify({ type: 'auth', token }));
     });
-    socket.addEventListener('message', event => handleSocketEvent(event, handlers));
-    socket.addEventListener('close', scheduleDMReconnect);
+    socket.addEventListener('message', event => {
+      if (socket !== dmSocket) return;
+      const payload = handleSocketEvent(event, handlers);
+      if (payload?.type === 'auth.ok') {
+        if (dmStableTimer) window.clearTimeout(dmStableTimer);
+        dmStableTimer = window.setTimeout(() => {
+          dmReconnectAttempt = 0;
+          dmStableTimer = null;
+        }, 3000);
+      }
+      if (payload?.type === 'error' && ['unauthorized', 'forbidden'].includes(payload.detail)) {
+        dmManualDisconnect = true;
+        dmSocketConfig = null;
+      }
+    });
+    socket.addEventListener('close', event => {
+      if (socket !== dmSocket) return;
+      if (dmStableTimer) {
+        window.clearTimeout(dmStableTimer);
+        dmStableTimer = null;
+      }
+      if (event.code === 1008) {
+        dmManualDisconnect = true;
+        dmSocketConfig = null;
+        return;
+      }
+      scheduleDMReconnect();
+    });
     socket.addEventListener('error', () => handlers.onError({ type: 'error', detail: 'websocket error' }));
     return socket;
   }

@@ -142,6 +142,10 @@ class BotRunner:
                                               "token": self._state["access_token"]}))
                     ack = json.loads(await ws.recv())
                     if ack.get("type") != "auth.ok":
+                        detail = ack.get("detail", "unauthorized")
+                        log.error(f"[bot:{self.bot_id}] cannot watch channel {channel_id}: {detail}")
+                        if detail in {"unauthorized", "forbidden"}:
+                            return
                         await asyncio.sleep(5)
                         continue
                     log.info(f"[bot:{self.bot_id}] watching channel {channel_id}")
@@ -150,6 +154,12 @@ class BotRunner:
                         if self._stop_event.is_set():
                             return
                         event = json.loads(raw)
+                        if event.get("type") == "error":
+                            detail = event.get("detail", "websocket error")
+                            log.error(f"[bot:{self.bot_id}] channel {channel_id} closed by server: {detail}")
+                            if detail in {"unauthorized", "forbidden"}:
+                                return
+                            continue
                         if event.get("type") != "message.new":
                             continue
                         msg = event["data"]
@@ -165,8 +175,11 @@ class BotRunner:
                                                  reply_to_id=msg["id"], client=client)
                     if not self._stop_event.is_set():
                         await asyncio.sleep(5)
-            except websockets.exceptions.ConnectionClosed:
+            except websockets.exceptions.ConnectionClosed as e:
                 if self._stop_event.is_set():
+                    return
+                if getattr(e, "code", None) == 1008:
+                    log.error(f"[bot:{self.bot_id}] channel {channel_id} closed with policy violation, stop reconnecting")
                     return
                 await asyncio.sleep(5)
             except Exception as e:
