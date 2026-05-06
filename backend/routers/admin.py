@@ -514,6 +514,7 @@ def _ensure_user_for_bot(bot: Bot, db: Session) -> None:
         password_hash=hash_password(bot.password),
         avatar_color=bot.avatar_color,
         status="online",
+        is_bot=True,
     )
     db.add(user)
     db.flush()

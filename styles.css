@@ -1677,7 +1677,7 @@ body {
 /* Role tinted names */
 .role-founder { color: var(--rust); }
 .role-editor { color: var(--plum); }
-.role-bot { color: var(--sage); }
+.role-bot { color: #e06c75; }
 .role-mod { color: var(--teal); }
 
 /* ==============================

@@ -16,6 +16,7 @@ class UserSchema(BaseModel):
     status: str
     bio: str | None = None
     created_at: datetime | None = None
+    is_bot: bool = False
     is_admin: bool = False
 
 

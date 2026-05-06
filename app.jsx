@@ -513,16 +513,19 @@ function App() {
           name: m.user.display_name,
           color: m.user.avatar_color || 'av-1',
           avatar_url: m.user.avatar_url || null,
-          role: m.role,
+          role: m.user.is_bot ? 'bot' : m.role,
+          isBot: m.user.is_bot || false,
           status: m.user.status || 'offline',
           activity: m.user.bio || '',
         }));
-        const founders = mapped.filter(m => m.role === 'founder' && m.status === 'online');
-        const online = mapped.filter(m => m.role !== 'founder' && m.status === 'online');
-        const dnd = mapped.filter(m => m.status === 'dnd');
-        const idle = mapped.filter(m => m.status === 'idle');
-        const offline = mapped.filter(m => m.status === 'offline' || !['online','idle','dnd'].includes(m.status));
+        const bots = mapped.filter(m => m.isBot && m.status !== 'offline');
+        const founders = mapped.filter(m => !m.isBot && m.role === 'founder' && m.status === 'online');
+        const online = mapped.filter(m => !m.isBot && m.role !== 'founder' && m.status === 'online');
+        const dnd = mapped.filter(m => !m.isBot && m.status === 'dnd');
+        const idle = mapped.filter(m => !m.isBot && m.status === 'idle');
+        const offline = mapped.filter(m => !m.isBot && (m.status === 'offline' || !['online','idle','dnd'].includes(m.status)));
         const groups = [];
+        if (bots.length) groups.push({ group: '机器人', key: 'bots', items: bots });
         if (founders.length) groups.push({ group: '在线 · 创建者', key: 'online-f', items: founders });
         if (online.length) groups.push({ group: '在线', key: 'online', items: online });
         if (dnd.length) groups.push({ group: '勿扰', key: 'dnd', items: dnd });

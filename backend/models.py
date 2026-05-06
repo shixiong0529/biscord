@@ -22,6 +22,7 @@ class User(Base):
     telegram_bot_token: Mapped[str | None] = mapped_column(String(128), nullable=True, default=None)
     telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, default=None)
     telegram_notify_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     is_banned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     banned_reason: Mapped[str | None] = mapped_column(String(256), nullable=True, default=None)
