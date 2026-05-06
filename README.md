@@ -105,6 +105,15 @@
 - [x] 好友申请 / 通过 / 删除事件
 - [x] 新私信即时推送
 
+### AI 机器人
+- [x] 在管理后台创建 AI bot，配置用户名、显示名、密码
+- [x] 支持任何 OpenAI 兼容接口（DeepSeek / Kimi / OpenAI / 自定义）
+- [x] 管理后台一键启动 / 停止 bot 进程
+- [x] 指定监听频道（或自动发现管理员服务器所有文字频道）
+- [x] 用户 `@bot名` 触发回复，支持多轮对话上下文
+- [x] 每频道独立历史，`@bot名 /reset` 清空上下文
+- [x] 更换大模型预设（DeepSeek / Kimi / OpenAI / 自定义）不重启即生效
+
 ### Telegram 推送通知
 - [x] 每用户独立 Bot Token（自带 bot，不依赖服务器统一 bot）
 - [x] 绑定方式：填入 Bot Token + Chat ID → 测试连接 → 自动绑定
@@ -137,6 +146,7 @@
 ```
 biscord/
 ├── Hearth Community.html   # 前端入口（直接浏览器打开或通过后端访问）
+├── admin.html              # 管理后台入口
 ├── styles.css              # 全局样式（主题变量、组件样式）
 ├── icons.jsx               # SVG 图标库
 ├── data.jsx                # 静态种子数据（fallback）
@@ -146,13 +156,20 @@ biscord/
 ├── chat.jsx                # 聊天区域、消息渲染、输入框
 ├── modals.jsx              # 所有弹窗（创建服务器、设置、好友、邀请等）
 ├── extra.jsx               # 辅助组件（DM 视图、好友页、Telegram 面板）
+├── admin.jsx               # 管理后台前端
 ├── app.jsx                 # 根组件（状态管理、路由逻辑）
+├── bot/                    # 独立 bot 脚本（备用，可不启动）
+│   ├── bot.py
+│   ├── config.py
+│   ├── requirements.txt
+│   └── .env.example
 └── backend/
     ├── main.py             # FastAPI 应用入口、路由注册、静态文件服务
     ├── database.py         # SQLAlchemy 引擎和 session
-    ├── models.py           # 所有 ORM 模型（13 张表）
+    ├── models.py           # 所有 ORM 模型（14 张表）
     ├── schemas.py          # Pydantic 请求/响应模型
     ├── auth.py             # JWT 工具函数、密码验证
+    ├── bot_runner.py       # Bot 进程管理（asyncio 后台任务）
     ├── seed.py             # 数据库种子脚本（初始数据）
     ├── telegram_service.py # Telegram 通知服务
     ├── requirements.txt
@@ -167,7 +184,8 @@ biscord/
         ├── dm.py           # 私信
         ├── friends.py      # 好友系统
         ├── websocket.py    # WebSocket 连接管理器
-        └── telegram_bot.py # Telegram 绑定 API
+        ├── telegram_bot.py # Telegram 绑定 API
+        └── admin.py        # 管理后台 API（用户/服务器/bot 管理）
 ```
 
 ---
@@ -255,6 +273,12 @@ SECRET_KEY=请替换为至少32位的随机字符串
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=30
 
+# Bot 进程调用自身 API 的地址（生产服务器填本地端口，如 http://localhost:8001）
+API_BASE=http://localhost:8000
+
+# 允许跨域的前端来源（逗号分隔，生产环境填域名）
+CORS_ORIGINS=https://shi.show,https://moyu.in
+
 # Telegram 通知（可选）
 # 留空时通知功能静默禁用，不影响其他功能
 TELEGRAM_BOT_TOKEN=
@@ -274,7 +298,7 @@ DATABASE_URL=sqlite:///./biscord.db
 
 ## 数据库结构
 
-共 13 张表：
+共 14 张表：
 
 | 表名 | 说明 |
 |------|------|
@@ -291,6 +315,7 @@ DATABASE_URL=sqlite:///./biscord.db
 | `join_requests` | 服务器加入申请 |
 | `friend_requests` | 好友申请 |
 | `friendships` | 好友关系（双向存储） |
+| `bots` | AI bot 配置（LLM 接口、监听频道、运行状态） |
 
 ---
 
@@ -400,6 +425,20 @@ Authorization: Bearer <access_token>
 | GET | `/telegram/status` | 查询绑定状态 |
 | PATCH | `/telegram/notify` | 开启/关闭推送（`{"enabled": true}`） |
 | DELETE | `/telegram/bind` | 解除绑定 |
+
+### 管理后台（需 `is_admin=true`）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/admin/stats` | 概览统计 |
+| GET/PATCH/DELETE | `/api/admin/users/{id}` | 用户管理（封禁/解封/设管理员/删除） |
+| GET/DELETE | `/api/admin/servers/{id}` | 服务器管理 |
+| GET | `/api/admin/bots` | Bot 列表 |
+| POST | `/api/admin/bots` | 新建 bot（自动注册账号） |
+| GET/PATCH/DELETE | `/api/admin/bots/{id}` | Bot 详情/修改/删除 |
+| POST | `/api/admin/bots/{id}/start` | 启动 bot |
+| POST | `/api/admin/bots/{id}/stop` | 停止 bot |
+| GET | `/api/admin/bots/{id}/available-channels` | 可选频道列表 |
 
 ---
 

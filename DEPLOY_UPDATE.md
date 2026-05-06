@@ -189,6 +189,10 @@ SECRET_KEY=替换为服务器上的随机密钥
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=30
 APP_BASE_URL=https://shi.show
+# Bot 进程调用自身 API（填本地端口，避免绕道域名）
+API_BASE=http://localhost:8001
+# 允许跨域的前端来源
+CORS_ORIGINS=https://shi.show,https://moyu.in
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_WEBHOOK_SECRET=
 ```
