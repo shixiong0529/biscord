@@ -34,6 +34,12 @@ sudo systemctl status biscord --no-pager
 curl https://moyu.in/api/health
 ```
 
+说明：
+
+- 如果本次更新包含 `backend/alembic/versions/` 下的新迁移文件，执行 `python -m alembic upgrade head` 会同步数据库结构。
+- 如果只是前端、后端业务代码或样式更新，没有数据库结构变化，`git pull` 后重启 `biscord` 服务即可。
+- `python -m alembic heads` 可用于查看当前代码里最新的迁移头，正常情况下应只显示一个 head。
+
 `curl` 正常返回：
 
 ```json

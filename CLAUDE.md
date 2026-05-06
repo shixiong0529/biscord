@@ -4,21 +4,35 @@
 
 ## 运行项目
 
-用浏览器直接打开 `Hearth Community.html`，无需构建步骤，无需服务器。React 18、ReactDOM 和 Babel standalone 均从 CDN 加载，所有 `.jsx` 文件在浏览器运行时由 Babel 即时转译。
+本项目是 FastAPI 后端 + React 18/Babel Standalone 前端。前端没有构建步骤，`.jsx` 文件在浏览器运行时由 Babel 即时转译；完整功能需要启动后端。
 
-本项目没有测试、lint 工具和包管理器。
+本地启动：
+
+```bash
+cd backend
+python -m alembic upgrade head
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+浏览器访问 `http://localhost:8000` 打开主站，访问 `http://localhost:8000/admin.html` 打开管理后台。直接双击打开 `Hearth Community.html` 只能用于静态界面预览，登录、上传、聊天、WebSocket、管理后台等功能需要后端。
+
+本项目没有前端构建、lint 工具和包管理器。
 
 ## 架构
 
-**无模块系统。** 每个 `.jsx` 文件末尾通过 `Object.assign(window, { 组件A, 组件B })` 将组件暴露到全局。脚本必须按 HTML 中 `<script>` 标签声明的顺序加载：
+**无前端模块系统。** 每个 `.jsx` 文件末尾通过 `Object.assign(window, { 组件A, 组件B })` 将组件暴露到全局。主站脚本必须按 HTML 中 `<script>` 标签声明的顺序加载：
 
 ```
-icons.jsx → data.jsx → sidebars.jsx → chat.jsx → modals.jsx → extra.jsx → app.jsx
+icons.jsx → data.jsx → sidebars.jsx → chat.jsx → modals.jsx → extra.jsx → api.jsx → auth.jsx → app.jsx
 ```
 
-**状态集中在 `app.jsx`** 的 `App` 组件中管理，包括当前服务器、频道、私信、主题、强调色、密度、消息列表，全部以 props 向下传递。用户偏好以 `hearth-` 为前缀持久化到 `localStorage`。
+管理后台入口是 `admin.html`，加载独立的 `admin.jsx`。
 
-**静态种子数据在 `data.jsx`**，通过 `Object.assign` 挂载到 `window`。主要数据结构：
+**状态集中在 `app.jsx`** 的 `App` 组件中管理，包括认证用户、当前服务器、频道、私信、主题、强调色、密度、消息列表和弹窗状态，全部以 props 向下传递。用户偏好以 `hearth-` 为前缀持久化到 `localStorage`。
+
+**后端 API 在 `backend/routers/`**，数据库模型在 `backend/models.py`，Pydantic schema 在 `backend/schemas.py`。数据库结构变更需要新增 Alembic 迁移并执行 `python -m alembic upgrade head`。
+
+**静态种子数据在 `data.jsx`**，通过 `Object.assign` 挂载到 `window`，仅作为 fallback/界面预览使用。主要数据结构：
 - `SERVERS` — 服务器栏条目（`kind: 'dm'` 表示私信入口）
 - `CHANNELS` — 以服务器 id 为键，每项包含分组的频道数组
 - `DM_LIST` — 私信联系人列表
@@ -57,7 +71,10 @@ HTML 中还内嵌了 `window.__HEARTH_TWEAKS`，包含初始 theme/accent/densit
 | `chat.jsx` | `ChatArea`、`ChatHeader`、`MessageGroup`、`Composer` |
 | `modals.jsx` | `Modal`、`CreateServerModal`、`ProfileCard`、`Settings`、`ToggleSwitch` |
 | `extra.jsx` | `TweaksPanel`、`DMView` |
+| `api.jsx` | `API` HTTP/WebSocket 客户端 |
+| `auth.jsx` | 登录、注册、认证状态 |
 | `app.jsx` | `App`（根组件）、内联侧边栏包装器 |
+| `admin.jsx` | 管理后台单页应用 |
 
 ## 消息格式
 

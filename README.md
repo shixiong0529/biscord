@@ -42,8 +42,9 @@
 
 ### 用户系统
 - [x] 注册 / 登录 / 登出（用户名 + 密码）
+- [x] 修改密码（校验当前密码后更新）
 - [x] JWT access token + refresh token，自动续期
-- [x] 个人资料编辑（显示名、自我介绍、头像颜色、在线状态）
+- [x] 个人资料编辑（显示名、自我介绍、代词、头像颜色、在线状态）
 - [x] 在线状态：在线 / 离开 / 请勿打扰 / 离线
 
 ### 服务器（社区）
@@ -109,10 +110,11 @@
 - [x] 在管理后台创建 AI bot，配置用户名、显示名、密码
 - [x] 支持任何 OpenAI 兼容接口（DeepSeek / Kimi / OpenAI / 自定义）
 - [x] 管理后台一键启动 / 停止 bot 进程
-- [x] 指定监听频道（或自动发现管理员服务器所有文字频道）
+- [x] 指定监听文字频道（或自动发现管理员服务器所有文字频道）
 - [x] 用户 `@bot名` 触发回复，支持多轮对话上下文
 - [x] 每频道独立历史，`@bot名 /reset` 清空上下文
 - [x] 更换大模型预设（DeepSeek / Kimi / OpenAI / 自定义）不重启即生效
+- [x] 成员列表按监听频道显示 bot；运行中为红色，停止服务为暗色
 
 ### Telegram 推送通知
 - [x] 每用户独立 Bot Token（自带 bot，不依赖服务器统一 bot）
@@ -166,7 +168,7 @@ biscord/
 └── backend/
     ├── main.py             # FastAPI 应用入口、路由注册、静态文件服务
     ├── database.py         # SQLAlchemy 引擎和 session
-    ├── models.py           # 所有 ORM 模型（14 张表）
+    ├── models.py           # 所有 ORM 模型（16 张表）
     ├── schemas.py          # Pydantic 请求/响应模型
     ├── auth.py             # JWT 工具函数、密码验证
     ├── bot_runner.py       # Bot 进程管理（asyncio 后台任务）
@@ -184,6 +186,7 @@ biscord/
         ├── dm.py           # 私信
         ├── friends.py      # 好友系统
         ├── websocket.py    # WebSocket 连接管理器
+        ├── reports.py      # 举报提交与处理
         ├── telegram_bot.py # Telegram 绑定 API
         └── admin.py        # 管理后台 API（用户/服务器/bot 管理）
 ```
@@ -298,7 +301,7 @@ DATABASE_URL=sqlite:///./biscord.db
 
 ## 数据库结构
 
-共 14 张表：
+共 16 张表：
 
 | 表名 | 说明 |
 |------|------|
@@ -312,6 +315,8 @@ DATABASE_URL=sqlite:///./biscord.db
 | `direct_messages` | 私信消息 |
 | `pinned_messages` | 置顶消息 |
 | `invites` | 服务器邀请码 |
+| `reports` | 用户举报记录 |
+| `audit_logs` | 管理后台操作日志 |
 | `join_requests` | 服务器加入申请 |
 | `friend_requests` | 好友申请 |
 | `friendships` | 好友关系（双向存储） |
@@ -342,7 +347,8 @@ Authorization: Bearer <access_token>
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/users/me` | 当前用户信息 |
-| PATCH | `/users/me` | 更新个人资料 |
+| PATCH | `/users/me` | 更新个人资料（显示名、自我介绍、代词、头像、状态等） |
+| PATCH | `/users/me/password` | 修改密码（current_password + new_password） |
 | GET | `/users/{id}` | 查看其他用户公开信息 |
 
 ### 服务器
@@ -438,7 +444,7 @@ Authorization: Bearer <access_token>
 | GET/PATCH/DELETE | `/api/admin/bots/{id}` | Bot 详情/修改/删除 |
 | POST | `/api/admin/bots/{id}/start` | 启动 bot |
 | POST | `/api/admin/bots/{id}/stop` | 停止 bot |
-| GET | `/api/admin/bots/{id}/available-channels` | 可选频道列表 |
+| GET | `/api/admin/bots/{id}/available-channels` | 可选文字频道列表 |
 
 ---
 
@@ -462,6 +468,9 @@ Authorization: Bearer <access_token>
 服务端回应：
 - 成功：`{"type": "auth.ok", "data": {"user_id": 5}}`
 - 失败：`{"type": "error", "detail": "unauthorized"}` + 断开连接
+- 无频道权限：`{"type": "error", "detail": "forbidden"}` + 以 `1008` 关闭连接
+
+前端客户端会自动重连临时断开的 WebSocket，但会忽略旧 socket 的延迟事件；收到 `unauthorized` / `forbidden` 或 `1008` 时停止重连，避免频道切换时产生重复连接。
 
 ### 服务端 → 客户端事件
 
