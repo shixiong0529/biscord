@@ -5,7 +5,7 @@
 ```
 IP：    8.148.27.161
 路径：  /opt/biscord/current
-域名：  https://shi.show  /  https://moyu.in
+域名：  https://moyu.in  /  https://shi.show
 SSH：   ssh root@8.148.27.161
 ```
 
@@ -31,7 +31,7 @@ python -m alembic upgrade head
 
 sudo systemctl restart biscord
 sudo systemctl status biscord --no-pager
-curl https://shi.show/api/health
+curl https://moyu.in/api/health
 ```
 
 `curl` 正常返回：
@@ -92,7 +92,7 @@ psql "postgresql://biscord:Biscord_2026_Strong_Pass@127.0.0.1:5432/biscord" \
   -c "SELECT id, name FROM servers ORDER BY id;"
 
 sudo systemctl start biscord
-curl https://shi.show/api/health
+curl https://moyu.in/api/health
 ```
 
 ## 查看日志
@@ -113,7 +113,7 @@ Biscord 服务：
 
 ```bash
 sudo systemctl status biscord --no-pager
-curl https://shi.show/api/health
+curl https://moyu.in/api/health
 ```
 
 Nginx 服务：
@@ -157,12 +157,13 @@ sudo systemctl status biscord --no-pager
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
-sudo nginx -T 2>/dev/null | grep -nE "server_name shi.show|server_name chat.slow.best|proxy_pass http://127.0.0.1:8000|proxy_pass http://127.0.0.1:8001"
+sudo nginx -T 2>/dev/null | grep -nE "server_name moyu.in|server_name shi.show|server_name chat.slow.best|proxy_pass http://127.0.0.1:8000|proxy_pass http://127.0.0.1:8001"
 ```
 
 当前约定：
 
 ```text
+moyu.in        -> 127.0.0.1:8001 -> Biscord
 shi.show       -> 127.0.0.1:8001 -> Biscord
 chat.slow.best -> 127.0.0.1:8000 -> 旧 red 项目
 ```
@@ -188,7 +189,7 @@ DATABASE_URL=postgresql://biscord:Biscord_2026_Strong_Pass@127.0.0.1:5432/biscor
 SECRET_KEY=替换为服务器上的随机密钥
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=30
-APP_BASE_URL=https://shi.show
+APP_BASE_URL=https://moyu.in
 # Bot 进程调用自身 API（填本地端口，避免绕道域名）
 API_BASE=http://localhost:8001
 # 允许跨域的前端来源
@@ -257,8 +258,8 @@ sudo nginx -s reload
 
 ```bash
 sudo certbot certificates
-curl -I https://shi.show
 curl -I https://moyu.in
+curl -I https://shi.show
 ```
 
 ### 证书到期时间
