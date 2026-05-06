@@ -44,7 +44,7 @@ class ConnectionManager:
         for websocket in list(self.channel_connections.get(channel_id, set())):
             try:
                 await websocket.send_json(message)
-            except RuntimeError:
+            except Exception:
                 dead.append(websocket)
         for websocket in dead:
             await self.disconnect_channel(channel_id, websocket)
