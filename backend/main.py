@@ -12,7 +12,7 @@ from sqlalchemy import inspect, text
 
 from auth import get_current_user
 from database import engine
-from models import FriendRequest, Friendship, JoinRequest, User
+from models import Bot, FriendRequest, Friendship, JoinRequest, User
 from routers import auth, channels, dm, friends, reports, servers, users, websocket
 from routers import telegram_bot
 from routers import admin as admin_router
@@ -33,6 +33,19 @@ async def lifespan(app: FastAPI):
             elif not _user.is_admin:
                 _user.is_admin = True
                 _db.commit()
+
+    # Restore active bots
+    from bot_runner import running_bots, BotRunner
+    from sqlalchemy.orm import Session as _Session
+    from sqlalchemy import select as _select
+    api_base = os.getenv("API_BASE", "http://localhost:8000")
+    with _Session(engine) as _db:
+        active_bots = _db.scalars(_select(Bot).where(Bot.is_active == True)).all()
+        for bot_obj in active_bots:
+            runner = BotRunner(bot_obj, api_base)
+            running_bots[bot_obj.id] = runner
+            runner.start()
+
     yield
 
 

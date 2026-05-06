@@ -258,3 +258,24 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     admin: Mapped["User"] = relationship(foreign_keys=[admin_id])
+
+
+class Bot(Base):
+    __tablename__ = "bots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    username: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    password: Mapped[str] = mapped_column(String(128), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(32), nullable=False)
+    avatar_color: Mapped[str] = mapped_column(String(16), nullable=False, default="av-3", server_default="av-3")
+    llm_api_key: Mapped[str] = mapped_column(String(256), nullable=False)
+    llm_base_url: Mapped[str] = mapped_column(String(256), nullable=False, default="https://api.deepseek.com", server_default="https://api.deepseek.com")
+    llm_model: Mapped[str] = mapped_column(String(64), nullable=False, default="deepseek-chat", server_default="deepseek-chat")
+    system_prompt: Mapped[str] = mapped_column(Text, nullable=False, default="你是摸鱼社区的 AI 助手，风格轻松友好，回答简洁，适当使用中文网络用语。", server_default="你是摸鱼社区的 AI 助手，风格轻松友好，回答简洁，适当使用中文网络用语。")
+    channel_ids: Mapped[str] = mapped_column(Text, nullable=False, default="[]", server_default="[]")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+    user: Mapped["User | None"] = relationship(foreign_keys=[user_id])

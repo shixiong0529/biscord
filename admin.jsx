@@ -201,6 +201,7 @@ const NAV = [
   { id: 'invites', label: '🔗 邀请码' },
   { id: 'join-requests', label: '📋 加入申请' },
   { id: 'audit-logs', label: '📜 操作日志' },
+  { id: 'bots', label: '🤖 机器人' },
 ];
 
 function AdminSidebar({ page, onNav, onLogout, adminUser }) {
@@ -583,6 +584,8 @@ function AdminShell({ adminUser }) {
       case 'invites':       return <InvitesPage />;
       case 'join-requests': return <JoinRequestsPage />;
       case 'audit-logs':    return <AuditLogPage />;
+      case 'bots':          return <BotsPage onNav={goTo} />;
+      case 'bot-detail':    return <BotDetailPage botId={params.botId} onBack={() => goTo('bots')} />;
       default:              return <DashboardPage />;
     }
   }
@@ -591,6 +594,292 @@ function AdminShell({ adminUser }) {
     <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--paper-0)', color: 'var(--ink-0)' }}>
       <AdminSidebar page={nav.page} onNav={goTo} onLogout={logout} adminUser={adminUser} />
       <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>{renderPage()}</main>
+    </div>
+  );
+}
+
+// ─── Bots ────────────────────────────────────────────────────────
+
+const LLM_PRESETS = [
+  { label: 'DeepSeek', base_url: 'https://api.deepseek.com', model: 'deepseek-chat' },
+  { label: 'Kimi', base_url: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+  { label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-4o' },
+  { label: '自定义', base_url: '', model: '' },
+];
+
+const sectionBox = { background: 'var(--paper-1)', borderRadius: 8, padding: '16px 20px', border: '1px solid var(--paper-2)', marginBottom: 14 };
+const fldLabel = { display: 'block', fontSize: 13, color: 'var(--ink-2)', marginBottom: 4 };
+const fldRow = { marginBottom: 12 };
+const fullInput = { width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--paper-2)', background: 'var(--paper-0)', color: 'var(--ink-0)', fontSize: 15, boxSizing: 'border-box' };
+
+function BotCreateModal({ onClose, onCreated }) {
+  const [form, setForm] = React.useState({
+    name: '', username: '', password: '', display_name: '',
+    llm_api_key: '', llm_base_url: 'https://api.deepseek.com', llm_model: 'deepseek-chat',
+    system_prompt: '你是摸鱼社区的 AI 助手，风格轻松友好，回答简洁，适当使用中文网络用语。',
+  });
+  const [preset, setPreset] = React.useState(0);
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState('');
+
+  function set(field) { return e => setForm(f => ({ ...f, [field]: e.target.value })); }
+  function applyPreset(idx) {
+    setPreset(idx);
+    const p = LLM_PRESETS[idx];
+    if (p.base_url) setForm(f => ({ ...f, llm_base_url: p.base_url, llm_model: p.model }));
+  }
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true); setErr('');
+    try { const bot = await api.post('/api/admin/bots', form); onCreated(bot); }
+    catch (e) { setErr(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+         onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'var(--paper-1)', borderRadius: 8, padding: 24, width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>新建机器人</div>
+        <form onSubmit={submit}>
+          <div style={fldRow}><label style={fldLabel}>备注名</label><input style={fullInput} value={form.name} onChange={set('name')} placeholder="如：摸鱼助手" /></div>
+          <div style={fldRow}><label style={fldLabel}>用户名（英文+数字+下划线）</label><input style={fullInput} value={form.username} onChange={set('username')} placeholder="moyu_bot" /></div>
+          <div style={fldRow}><label style={fldLabel}>密码</label><input style={fullInput} type="password" value={form.password} onChange={set('password')} placeholder="至少6位" /></div>
+          <div style={fldRow}><label style={fldLabel}>显示名（聊天中显示）</label><input style={fullInput} value={form.display_name} onChange={set('display_name')} placeholder="摸鱼助手" /></div>
+          <div style={fldRow}>
+            <label style={fldLabel}>大模型预设</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {LLM_PRESETS.map((p, i) => (
+                <button type="button" key={i} onClick={() => applyPreset(i)}
+                  style={{ padding: '4px 10px', fontSize: 13, borderRadius: 6, border: 'none', cursor: 'pointer',
+                    background: preset === i ? 'var(--accent)' : 'var(--paper-2)',
+                    color: preset === i ? 'var(--accent-ink, #fff)' : 'var(--ink-1)' }}>{p.label}</button>
+              ))}
+            </div>
+          </div>
+          <div style={fldRow}><label style={fldLabel}>API Key</label><input style={fullInput} value={form.llm_api_key} onChange={set('llm_api_key')} placeholder="sk-..." /></div>
+          <div style={fldRow}><label style={fldLabel}>Base URL</label><input style={fullInput} value={form.llm_base_url} onChange={set('llm_base_url')} /></div>
+          <div style={fldRow}><label style={fldLabel}>模型名</label><input style={fullInput} value={form.llm_model} onChange={set('llm_model')} /></div>
+          <div style={fldRow}><label style={fldLabel}>System Prompt</label>
+            <textarea style={{ ...fullInput, resize: 'vertical' }} value={form.system_prompt} onChange={set('system_prompt')} rows={3} />
+          </div>
+          {err && <Err msg={err} />}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+            <Btn onClick={onClose}>取消</Btn>
+            <Btn type="submit" disabled={saving}>{saving ? '创建中…' : '创建'}</Btn>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BotsPage({ onNav }) {
+  const [rev, setRev] = React.useState(0);
+  const { loading, data: bots, error } = useAsync(() => api.get('/api/admin/bots'), [rev]);
+  const [showCreate, setShowCreate] = React.useState(false);
+  const [toggling, setToggling] = React.useState({});
+  const [msg, setMsg] = React.useState('');
+
+  async function toggle(bot) {
+    setToggling(t => ({ ...t, [bot.id]: true }));
+    try {
+      await api.post(`/api/admin/bots/${bot.id}/${bot.is_active ? 'stop' : 'start'}`);
+      setRev(r => r + 1);
+    } catch (e) { setMsg(e.message); }
+    finally { setToggling(t => ({ ...t, [bot.id]: false })); }
+  }
+
+  return (
+    <div style={{ padding: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>机器人管理</div>
+        <Btn onClick={() => setShowCreate(true)}>+ 新建机器人</Btn>
+      </div>
+      <Flash msg={msg} />
+      {loading && <Spinner />}
+      {error && <Err msg={error} />}
+      {bots && (
+        <div style={{ background: 'var(--paper-1)', borderRadius: 8, border: '1px solid var(--paper-2)', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--paper-2)', color: 'var(--ink-2)', fontSize: 13 }}>
+                {['名称','用户名','显示名','模型','状态','操作'].map(h => (
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {bots.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--ink-2)' }}>暂无机器人</td></tr>
+              )}
+              {bots.map(bot => (
+                <tr key={bot.id} style={{ borderBottom: '1px solid var(--paper-2)' }}>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ cursor: 'pointer', color: 'var(--accent)', fontWeight: 600 }} onClick={() => onNav('bot-detail', { botId: bot.id })}>{bot.name}</span>
+                  </td>
+                  <td style={{ padding: '10px 12px', color: 'var(--ink-2)', fontSize: 13 }}>@{bot.username}</td>
+                  <td style={{ padding: '10px 12px' }}>{bot.display_name}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 13, color: 'var(--ink-2)' }}>{bot.llm_model}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <Badge label={bot.is_active ? '运行中' : '已停止'} color={bot.is_active ? '#3a9d5c' : ''} />
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <Btn small danger={bot.is_active} disabled={toggling[bot.id]} onClick={() => toggle(bot)}>
+                      {toggling[bot.id] ? '…' : bot.is_active ? '停止' : '启动'}
+                    </Btn>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {showCreate && (
+        <BotCreateModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { setShowCreate(false); setRev(r => r + 1); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function BotDetailPage({ botId, onBack }) {
+  const [rev, setRev] = React.useState(0);
+  const { loading, data: bot, error } = useAsync(() => api.get(`/api/admin/bots/${botId}`), [botId, rev]);
+  const { data: allChannels } = useAsync(() => api.get(`/api/admin/bots/${botId}/available-channels`), [botId]);
+  const [form, setForm] = React.useState(null);
+  const [preset, setPreset] = React.useState(0);
+  const [msg, setMsg] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [toggling, setToggling] = React.useState(false);
+
+  React.useEffect(() => {
+    if (bot) {
+      setForm({ name: bot.name, display_name: bot.display_name, password: '',
+        llm_api_key: '', llm_base_url: bot.llm_base_url, llm_model: bot.llm_model,
+        system_prompt: bot.system_prompt, channel_ids: bot.channel_ids || [] });
+      const idx = LLM_PRESETS.findIndex(p => p.base_url === bot.llm_base_url);
+      setPreset(idx >= 0 ? idx : 3);
+    }
+  }, [bot]);
+
+  function set(field) { return e => setForm(f => ({ ...f, [field]: e.target.value })); }
+  function applyPreset(idx) {
+    setPreset(idx);
+    const p = LLM_PRESETS[idx];
+    if (p.base_url) setForm(f => ({ ...f, llm_base_url: p.base_url, llm_model: p.model }));
+  }
+
+  async function save() {
+    setSaving(true); setMsg('');
+    try {
+      const patch = { ...form };
+      if (!patch.password) delete patch.password;
+      if (!patch.llm_api_key) delete patch.llm_api_key;
+      await api.patch(`/api/admin/bots/${botId}`, patch);
+      setMsg('保存成功');
+      setRev(r => r + 1);
+    } catch (e) { setMsg(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function toggleActive() {
+    setToggling(true); setMsg('');
+    try {
+      await api.post(`/api/admin/bots/${botId}/${bot.is_active ? 'stop' : 'start'}`);
+      setRev(r => r + 1);
+    } catch (e) { setMsg(e.message); }
+    finally { setToggling(false); }
+  }
+
+  async function deleteBot() {
+    if (!confirm(`确认删除机器人「${bot.name}」？此操作将同时删除其用户账号。`)) return;
+    try { await api.del(`/api/admin/bots/${botId}`); onBack(); }
+    catch (e) { setMsg(e.message); }
+  }
+
+  function toggleChannel(chId) {
+    setForm(f => {
+      const ids = f.channel_ids.includes(chId) ? f.channel_ids.filter(x => x !== chId) : [...f.channel_ids, chId];
+      return { ...f, channel_ids: ids };
+    });
+  }
+
+  if (loading) return <div style={{ padding: 32 }}><Spinner /></div>;
+  if (error) return <div style={{ padding: 32 }}><Err msg={error} /></div>;
+  if (!form) return null;
+
+  return (
+    <div style={{ padding: 32, maxWidth: 720 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <BackBtn onClick={onBack} />
+        <div style={{ fontSize: 20, fontWeight: 700 }}>{bot.name}</div>
+        <Badge label={bot.is_active ? '运行中' : '已停止'} color={bot.is_active ? '#3a9d5c' : ''} />
+        <div style={{ marginLeft: 'auto' }}>
+          <Btn danger={bot.is_active} disabled={toggling} onClick={toggleActive}>
+            {toggling ? '…' : bot.is_active ? '停止服务' : '启动服务'}
+          </Btn>
+        </div>
+      </div>
+      <Flash msg={msg} />
+
+      <div style={sectionBox}>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>基本信息</div>
+        <div style={fldRow}><label style={fldLabel}>备注名</label><input style={fullInput} value={form.name} onChange={set('name')} /></div>
+        <div style={{ ...fldRow, fontSize: 14, color: 'var(--ink-2)' }}>用户名：@{bot.username}</div>
+        <div style={fldRow}><label style={fldLabel}>显示名</label><input style={fullInput} value={form.display_name} onChange={set('display_name')} /></div>
+        <div style={fldRow}><label style={fldLabel}>修改密码（留空则不变）</label><input style={fullInput} type="password" value={form.password} onChange={set('password')} placeholder="留空保持原密码" /></div>
+      </div>
+
+      <div style={sectionBox}>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>大模型配置</div>
+        <div style={fldRow}>
+          <label style={fldLabel}>预设</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {LLM_PRESETS.map((p, i) => (
+              <button type="button" key={i} onClick={() => applyPreset(i)}
+                style={{ padding: '4px 10px', fontSize: 13, borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: preset === i ? 'var(--accent)' : 'var(--paper-2)',
+                  color: preset === i ? 'var(--accent-ink, #fff)' : 'var(--ink-1)' }}>{p.label}</button>
+            ))}
+          </div>
+        </div>
+        <div style={fldRow}><label style={fldLabel}>API Key（留空则不修改）</label><input style={fullInput} value={form.llm_api_key} onChange={set('llm_api_key')} placeholder="留空保持原 key" /></div>
+        <div style={fldRow}><label style={fldLabel}>Base URL</label><input style={fullInput} value={form.llm_base_url} onChange={set('llm_base_url')} /></div>
+        <div style={fldRow}><label style={fldLabel}>模型名</label><input style={fullInput} value={form.llm_model} onChange={set('llm_model')} /></div>
+        <div style={fldRow}><label style={fldLabel}>System Prompt</label>
+          <textarea style={{ ...fullInput, resize: 'vertical' }} value={form.system_prompt} onChange={set('system_prompt')} rows={3} />
+        </div>
+      </div>
+
+      <div style={sectionBox}>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>监听频道</div>
+        <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 12 }}>留空则自动监听管理员服务器所有文字频道</div>
+        {allChannels && allChannels.map(srv => (
+          <div key={srv.server_id} style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)', marginBottom: 4 }}>{srv.server_name}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {srv.channels.map(ch => {
+                const selected = form.channel_ids.includes(ch.id);
+                return (
+                  <div key={ch.id} onClick={() => toggleChannel(ch.id)}
+                    style={{ padding: '3px 10px', borderRadius: 4, fontSize: 13, cursor: 'pointer',
+                      background: selected ? 'var(--accent)' : 'var(--paper-2)',
+                      color: selected ? 'var(--accent-ink, #fff)' : 'var(--ink-1)' }}>#{ch.name}</div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
+        <Btn danger onClick={deleteBot}>删除机器人</Btn>
+        <Btn disabled={saving} onClick={save}>{saving ? '保存中…' : '保存更改'}</Btn>
+      </div>
     </div>
   );
 }

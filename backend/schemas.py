@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+import json as _json
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class UserSchema(BaseModel):
@@ -244,3 +246,54 @@ class ReportCreateRequest(BaseModel):
     target_type: str = Field(pattern=r"^(message|user|server)$")
     target_id: int
     reason: str = Field(min_length=1, max_length=512)
+
+
+# ── Bot schemas ────────────────────────────────────────────────────
+
+class BotCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_]+$")
+    password: str = Field(min_length=6, max_length=128)
+    display_name: str = Field(min_length=1, max_length=32)
+    llm_api_key: str = Field(min_length=1, max_length=256)
+    llm_base_url: str = Field(default="https://api.deepseek.com", max_length=256)
+    llm_model: str = Field(default="deepseek-chat", max_length=64)
+    system_prompt: str = Field(default="你是摸鱼社区的 AI 助手，风格轻松友好，回答简洁，适当使用中文网络用语。")
+    channel_ids: list[int] = []
+
+
+class BotUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    display_name: str | None = Field(default=None, min_length=1, max_length=32)
+    password: str | None = Field(default=None, min_length=6, max_length=128)
+    llm_api_key: str | None = Field(default=None, min_length=1, max_length=256)
+    llm_base_url: str | None = Field(default=None, max_length=256)
+    llm_model: str | None = Field(default=None, max_length=64)
+    system_prompt: str | None = None
+    channel_ids: list[int] | None = None
+
+
+class BotOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    username: str
+    display_name: str
+    avatar_color: str
+    llm_base_url: str
+    llm_model: str
+    system_prompt: str
+    channel_ids: list[int]
+    is_active: bool
+    user_id: int | None = None
+    created_at: datetime
+
+    @field_validator("channel_ids", mode="before")
+    @classmethod
+    def parse_channel_ids(cls, v):
+        if isinstance(v, str):
+            try:
+                return _json.loads(v)
+            except Exception:
+                return []
+        return v or []

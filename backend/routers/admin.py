@@ -1,3 +1,5 @@
+import json
+import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -5,16 +7,17 @@ from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, func, select, update as sa_update
 from sqlalchemy.orm import Session
 
-from auth import get_current_user
+from auth import get_current_user, hash_password
 from database import get_db
 from models import (
-    AuditLog, Channel, ChannelGroup, DirectMessage, FriendRequest,
+    AuditLog, Bot, Channel, ChannelGroup, DirectMessage, FriendRequest,
     Friendship, Invite, JoinRequest, Message, PinnedMessage,
     Reaction, Report, Server, ServerMember, User,
 )
 from schemas import (
     AdminServerSchema, AdminStatsSchema, AdminUserSchema,
-    AuditLogSchema, BanRequest, ChannelSchema, OkResponse, ReportSchema,
+    AuditLogSchema, BanRequest, BotCreate, BotOut, BotUpdate,
+    ChannelSchema, OkResponse, ReportSchema,
     ResolveReportRequest, SetAdminRequest,
 )
 
@@ -478,3 +481,221 @@ def list_audit_logs(
         stmt = stmt.where(AuditLog.action == action)
     stmt = stmt.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit)
     return db.scalars(stmt).all()
+
+
+# ── Bots ─────────────────────────────────────────────────────────
+
+def _bot_is_running(bot_id: int) -> bool:
+    from bot_runner import running_bots
+    r = running_bots.get(bot_id)
+    return r is not None and r._task is not None and not r._task.done()
+
+
+def _ensure_user_for_bot(bot: Bot, db: Session) -> None:
+    """Create or update the User account for this bot."""
+    if bot.user_id:
+        user = db.get(User, bot.user_id)
+        if user:
+            user.display_name = bot.display_name
+            user.password_hash = hash_password(bot.password)
+            db.flush()
+            return
+    existing = db.scalar(select(User).where(User.username == bot.username))
+    if existing:
+        existing.display_name = bot.display_name
+        existing.password_hash = hash_password(bot.password)
+        bot.user_id = existing.id
+        db.flush()
+        return
+    user = User(
+        username=bot.username,
+        display_name=bot.display_name,
+        password_hash=hash_password(bot.password),
+        avatar_color=bot.avatar_color,
+        status="online",
+    )
+    db.add(user)
+    db.flush()
+    bot.user_id = user.id
+    # Auto-join all auto_join servers
+    for srv in db.scalars(select(Server).where(Server.auto_join == True).order_by(Server.join_order)).all():
+        if not db.scalar(select(ServerMember).where(ServerMember.server_id == srv.id, ServerMember.user_id == user.id)):
+            db.add(ServerMember(server_id=srv.id, user_id=user.id, role="member"))
+    db.flush()
+
+
+def _ensure_bot_server_memberships(bot: Bot, db: Session) -> None:
+    """Join the bot user into every server that contains an assigned channel."""
+    if not bot.user_id:
+        return
+    try:
+        channel_ids = json.loads(bot.channel_ids or "[]")
+    except Exception:
+        return
+    for ch_id in channel_ids:
+        ch = db.get(Channel, ch_id)
+        if ch is None:
+            continue
+        exists = db.scalar(select(ServerMember).where(
+            ServerMember.server_id == ch.server_id,
+            ServerMember.user_id == bot.user_id,
+        ))
+        if not exists:
+            db.add(ServerMember(server_id=ch.server_id, user_id=bot.user_id, role="member"))
+    db.flush()
+
+
+@router.get("/bots", response_model=list[BotOut])
+def list_bots(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    return db.scalars(select(Bot).order_by(Bot.id)).all()
+
+
+@router.post("/bots", response_model=BotOut, status_code=201)
+def create_bot(payload: BotCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    if db.scalar(select(Bot).where(Bot.username == payload.username)):
+        raise HTTPException(status_code=409, detail="username already taken")
+    bot = Bot(
+        name=payload.name,
+        username=payload.username,
+        password=payload.password,
+        display_name=payload.display_name,
+        llm_api_key=payload.llm_api_key,
+        llm_base_url=payload.llm_base_url,
+        llm_model=payload.llm_model,
+        system_prompt=payload.system_prompt,
+        channel_ids=json.dumps(payload.channel_ids),
+        is_active=False,
+    )
+    db.add(bot)
+    db.flush()
+    _ensure_user_for_bot(bot, db)
+    _ensure_bot_server_memberships(bot, db)
+    write_audit(db, admin.id, "create_bot", "bot", bot.id, {"username": bot.username})
+    db.commit()
+    db.refresh(bot)
+    return BotOut.model_validate(bot)
+
+
+@router.get("/bots/{bot_id}", response_model=BotOut)
+def get_bot(bot_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    bot = db.get(Bot, bot_id)
+    if bot is None:
+        raise HTTPException(status_code=404, detail="bot not found")
+    return bot
+
+
+@router.patch("/bots/{bot_id}", response_model=BotOut)
+async def update_bot(
+    bot_id: int,
+    payload: BotUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    bot = db.get(Bot, bot_id)
+    if bot is None:
+        raise HTTPException(status_code=404, detail="bot not found")
+    was_running = _bot_is_running(bot_id)
+    if was_running:
+        from bot_runner import running_bots
+        await running_bots[bot_id].stop()
+    for field, value in payload.model_dump(exclude_none=True).items():
+        if field == "channel_ids":
+            setattr(bot, field, json.dumps(value))
+        else:
+            setattr(bot, field, value)
+    if payload.display_name or payload.password:
+        _ensure_user_for_bot(bot, db)
+    if payload.channel_ids is not None:
+        _ensure_bot_server_memberships(bot, db)
+    write_audit(db, admin.id, "update_bot", "bot", bot_id)
+    db.commit()
+    db.refresh(bot)
+    if was_running:
+        from bot_runner import running_bots, BotRunner
+        api_base = os.getenv("API_BASE", "http://localhost:8000")
+        runner = BotRunner(bot, api_base)
+        running_bots[bot_id] = runner
+        runner.start()
+        bot.is_active = True
+        db.commit()
+    out = BotOut.model_validate(bot)
+    out.is_active = _bot_is_running(bot_id)
+    return out
+
+
+@router.delete("/bots/{bot_id}", response_model=OkResponse)
+async def delete_bot(bot_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    bot = db.get(Bot, bot_id)
+    if bot is None:
+        raise HTTPException(status_code=404, detail="bot not found")
+    if _bot_is_running(bot_id):
+        from bot_runner import running_bots
+        await running_bots[bot_id].stop()
+        running_bots.pop(bot_id, None)
+    write_audit(db, admin.id, "delete_bot", "bot", bot_id, {"username": bot.username})
+    if bot.user_id:
+        user = db.get(User, bot.user_id)
+        if user:
+            db.execute(sa_delete(ServerMember).where(ServerMember.user_id == user.id))
+            db.flush()
+            db.delete(user)
+            db.flush()
+    db.delete(bot)
+    db.commit()
+    return OkResponse(ok=True)
+
+
+@router.post("/bots/{bot_id}/start", response_model=OkResponse)
+async def start_bot(bot_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    bot = db.get(Bot, bot_id)
+    if bot is None:
+        raise HTTPException(status_code=404, detail="bot not found")
+    if _bot_is_running(bot_id):
+        return OkResponse(ok=True)
+    from bot_runner import running_bots, BotRunner
+    if bot_id in running_bots:
+        await running_bots[bot_id].stop()
+    api_base = os.getenv("API_BASE", "http://localhost:8000")
+    runner = BotRunner(bot, api_base)
+    running_bots[bot_id] = runner
+    runner.start()
+    bot.is_active = True
+    db.commit()
+    return OkResponse(ok=True)
+
+
+@router.post("/bots/{bot_id}/stop", response_model=OkResponse)
+async def stop_bot(bot_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    bot = db.get(Bot, bot_id)
+    if bot is None:
+        raise HTTPException(status_code=404, detail="bot not found")
+    if _bot_is_running(bot_id):
+        from bot_runner import running_bots
+        await running_bots[bot_id].stop()
+        running_bots.pop(bot_id, None)
+    bot.is_active = False
+    db.commit()
+    return OkResponse(ok=True)
+
+
+@router.get("/bots/{bot_id}/available-channels")
+def get_available_channels(bot_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Return all text channels grouped by server, for channel assignment UI."""
+    bot = db.get(Bot, bot_id)
+    if bot is None:
+        raise HTTPException(status_code=404, detail="bot not found")
+    servers = db.scalars(select(Server).order_by(Server.name)).all()
+    result = []
+    for srv in servers:
+        channels = db.scalars(
+            select(Channel)
+            .where(Channel.server_id == srv.id, Channel.kind == "text")
+            .order_by(Channel.position)
+        ).all()
+        if channels:
+            result.append({
+                "server_id": srv.id,
+                "server_name": srv.name,
+                "channels": [{"id": ch.id, "name": ch.name} for ch in channels],
+            })
+    return result
